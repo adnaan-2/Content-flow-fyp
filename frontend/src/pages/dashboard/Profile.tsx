@@ -50,7 +50,7 @@ const Profile = () => {
   const fetchUserData = async () => {
     try {
       const response = await authService.getProfile();
-      const userData = response.data;
+      const userData = response.data.user; // Access user from response.data
       setUser(userData);
       setFormData({ name: userData.name });
       
@@ -80,7 +80,7 @@ const Profile = () => {
       const response = await authService.updateProfile(formData);
       
       // Update local storage and auth context with new user data
-      const updatedUser = response.data;
+      const updatedUser = response.data.user; // Access user from response.data
       localStorage.setItem('user', JSON.stringify(updatedUser));
       setUser(updatedUser);
       updateUser(updatedUser);
@@ -160,18 +160,20 @@ const Profile = () => {
     }
   };
   
+  // Simple image upload handling
   const handleImageChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    // Check file type
+    console.log('File selected:', file.name, file.type, file.size);
+    
+    // Basic validation
     const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
-      setError('Invalid file type. Please upload a JPG, PNG, GIF, or WEBP image.');
+      setError('Please upload a valid image file (JPG, PNG, GIF, or WEBP).');
       return;
     }
     
-    // Check file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       setError('File too large. Maximum size is 5MB.');
       return;
@@ -181,30 +183,30 @@ const Profile = () => {
     setError('');
     
     try {
+      // Create FormData and append file
       const formData = new FormData();
-      formData.append('profileImage', file);
+      formData.append('profilePhoto', file);
       
+      console.log('Uploading file...');
       const response = await authService.uploadProfileImage(formData);
+      console.log('Upload response:', response.data);
       
-      // Update user data with new profile image
-      const updatedUser = response.data;
+      // Update user data with new profile photo URL
+      const newProfilePhoto = response.data.profilePhoto;
+      const updatedUser = { ...user, profilePhoto: newProfilePhoto };
+      
       localStorage.setItem('user', JSON.stringify(updatedUser));
       setUser(updatedUser);
       updateUser(updatedUser);
       
-      setSuccessMessage('Profile image updated successfully!');
+      setSuccessMessage('Profile photo updated successfully!');
+      setTimeout(() => setSuccessMessage(''), 3000);
       
-      // Clear message after 3 seconds
-      setTimeout(() => {
-        setSuccessMessage('');
-      }, 3000);
     } catch (err) {
       console.error('Upload error:', err);
-      setError(err.response?.data?.message || 'Failed to upload profile image');
-      
-      setTimeout(() => {
-        setError('');
-      }, 3000);
+      const errorMessage = err.response?.data?.message || 'Failed to upload profile photo';
+      setError(errorMessage);
+      setTimeout(() => setError(''), 3000);
     } finally {
       setImageUploading(false);
     }
@@ -239,9 +241,9 @@ const Profile = () => {
         <div className="flex justify-center p-8 bg-gradient-to-r from-primary/20 to-secondary/20">
           <div className="relative">
             <Avatar className="h-24 w-24 border-4 border-background shadow-xl">
-              {user?.profileImage ? (
+              {user?.profilePhoto ? (
                 <AvatarImage 
-                  src={user.profileImage} 
+                  src={user.profilePhoto} 
                   alt="Profile" 
                 />
               ) : (

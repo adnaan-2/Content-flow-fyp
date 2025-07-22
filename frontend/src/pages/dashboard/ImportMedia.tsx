@@ -21,7 +21,6 @@ const ImportMedia = () => {
   const [error, setError] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [success, setSuccess] = useState('');
-  const [connectionError, setConnectionError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
@@ -29,26 +28,25 @@ const ImportMedia = () => {
     fetchMedia();
   }, []);
   
+  // Simple fetch media
   const fetchMedia = async () => {
     setIsLoading(true);
     setError('');
-    setConnectionError(false);
     
     try {
+      console.log('Fetching media files...');
       const response = await mediaService.getAllMedia();
-      setMediaFiles(response.data.media);
+      console.log('Media fetched:', response.data.media?.length || 0, 'files');
+      setMediaFiles(response.data.media || []);
     } catch (err: any) {
-      console.error('Error fetching media files:', err);
-      if (err.code === 'ERR_NETWORK' || err.message === 'Network Error') {
-        setConnectionError(true);
-      } else {
-        setError('Failed to load media files. Please try again later.');
-        toast({
-          title: "Error",
-          description: "Failed to load media files",
-          variant: "destructive"
-        });
-      }
+      console.error('Error fetching media:', err);
+      const errorMsg = err.response?.data?.message || 'Failed to load media files';
+      setError(errorMsg);
+      toast({
+        title: "Error",
+        description: errorMsg,
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }
@@ -60,56 +58,41 @@ const ImportMedia = () => {
     }
   };
   
-  const handleRetry = () => {
-    fetchMedia();
-  };
-  
+  // Simple file upload handling
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
+    
+    console.log(`Selected ${files.length} files for upload`);
     
     setIsUploading(true);
     setUploadProgress(0);
     setError('');
     setSuccess('');
-    setConnectionError(false);
-    
-    // For demo purposes - create fake Cloudinary URLs when API is unavailable
-    if (connectionError) {
-      setTimeout(() => {
-        const fakeMediaFiles = files.map((file, index) => ({
-          _id: `fake-${Date.now()}-${index}`,
-          url: URL.createObjectURL(file),
-          originalname: file.name,
-          createdAt: new Date().toISOString()
-        }));
-        
-        setMediaFiles(prev => [...fakeMediaFiles, ...prev]);
-        setSuccess(`Successfully uploaded ${files.length} file${files.length > 1 ? 's' : ''} (Demo Mode)`);
-        toast({
-          title: "Success",
-          description: `Successfully uploaded ${files.length} file${files.length > 1 ? 's' : ''} (Demo Mode)`,
-        });
-        setIsUploading(false);
-        if (e.target) e.target.value = '';
-      }, 2000);
-      return;
-    }
-    
-    // Create FormData for upload
-    const formData = new FormData();
-    files.forEach((file) => {
-      formData.append('media', file);
-    });
     
     try {
-      // Upload with progress tracking
-      const response = await mediaService.uploadMedia(formData, (progressEvent: any) => {
-        const percentCompleted = Math.round(
-          (progressEvent.loaded * 100) / progressEvent.total
-        );
-        setUploadProgress(percentCompleted);
+      // Create FormData and add files
+      const formData = new FormData();
+      files.forEach((file) => {
+        formData.append('media', file);
       });
+      
+      console.log('Starting upload...');
+      
+      // Upload to backend (which uploads to Cloudinary)
+      const response = await mediaService.uploadMedia(formData, (progressEvent: any) => {
+        if (progressEvent.total) {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setUploadProgress(percentCompleted);
+        }
+      });
+      
+      console.log('Upload response:', response.data);
+      
+      // Add new media to the beginning of the list
+      if (response.data.media) {
+        setMediaFiles(prevFiles => [...response.data.media, ...prevFiles]);
+      }
       
       setSuccess(`Successfully uploaded ${files.length} file${files.length > 1 ? 's' : ''}`);
       toast({
@@ -117,33 +100,25 @@ const ImportMedia = () => {
         description: `Successfully uploaded ${files.length} file${files.length > 1 ? 's' : ''}`,
       });
       
-      // Add the newly uploaded media to the state
-      if (response.data.media) {
-        setMediaFiles(prevFiles => [...response.data.media, ...prevFiles]);
-      } else {
-        // Refresh the whole list
-        fetchMedia();
-      }
+      // Clear file input
+      if (e.target) e.target.value = '';
       
-      if (e.target) e.target.value = ''; // Clear the file input
     } catch (err: any) {
-      console.error('Error uploading media:', err);
-      if (err.code === 'ERR_NETWORK' || err.message === 'Network Error') {
-        setConnectionError(true);
-      } else {
-        const errorMsg = err.response?.data?.message || 'Failed to upload media. Please try again.';
-        setError(errorMsg);
-        toast({
-          title: "Upload failed",
-          description: errorMsg,
-          variant: "destructive"
-        });
-      }
+      console.error('Upload error:', err);
+      const errorMsg = err.response?.data?.message || 'Failed to upload files. Please try again.';
+      setError(errorMsg);
+      toast({
+        title: "Upload failed",
+        description: errorMsg,
+        variant: "destructive"
+      });
     } finally {
       setIsUploading(false);
+      setUploadProgress(0);
     }
   };
   
+  // Simple delete handling
   const handleDelete = async (mediaId: string) => {
     if (!window.confirm('Are you sure you want to delete this media? This action cannot be undone.')) {
       return;
@@ -152,27 +127,21 @@ const ImportMedia = () => {
     setError('');
     setSuccess('');
     
-    // For demo mode when API is unavailable
-    if (connectionError || mediaId.startsWith('fake-')) {
-      setMediaFiles(prevFiles => prevFiles.filter(file => file._id !== mediaId));
-      setSuccess('Media deleted successfully (Demo Mode)');
-      toast({
-        title: "Deleted",
-        description: "Media deleted successfully (Demo Mode)",
-      });
-      return;
-    }
-    
     try {
+      console.log('Deleting media:', mediaId);
       await mediaService.deleteMedia(mediaId);
+      
+      // Remove from state
+      setMediaFiles(prevFiles => prevFiles.filter(file => file._id !== mediaId));
+      
       setSuccess('Media deleted successfully');
       toast({
         title: "Deleted",
         description: "Media deleted successfully",
       });
-      setMediaFiles(prevFiles => prevFiles.filter(file => file._id !== mediaId));
+      
     } catch (err: any) {
-      console.error('Error deleting media:', err);
+      console.error('Delete error:', err);
       const errorMsg = err.response?.data?.message || 'Failed to delete media. Please try again.';
       setError(errorMsg);
       toast({
@@ -199,22 +168,6 @@ const ImportMedia = () => {
         {error && (
           <div className="bg-destructive/10 text-destructive p-4 rounded-lg border border-destructive/20">
             {error}
-          </div>
-        )}
-        
-        {connectionError && (
-          <div className="bg-amber-500/10 text-amber-500 p-4 rounded-lg border border-amber-500/20 flex gap-4">
-            <FaServer className="text-3xl" />
-            <div>
-              <h3 className="font-semibold text-lg">Server Connection Error</h3>
-              <p>Cannot connect to the media server. Working in demo mode with limited functionality.</p>
-              <button 
-                className="mt-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-600 px-4 py-2 rounded-md transition-colors"
-                onClick={handleRetry}
-              >
-                Try Again
-              </button>
-            </div>
           </div>
         )}
         

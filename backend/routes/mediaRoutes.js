@@ -64,79 +64,76 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
-// POST /api/media/upload - Upload new media
+// POST /api/media/upload - Simple media upload
 router.post('/upload', auth, upload.array('media', 10), async (req, res) => {
+  console.log('Media upload route hit');
+  console.log('Files received:', req.files?.length || 0);
+  
   try {
     if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ success: false, message: 'No files uploaded' });
+      return res.status(400).json({ 
+        success: false, 
+        message: 'No files uploaded. Please select some media files.' 
+      });
     }
     
-    const mediaFiles = [];
-    const uploadPromises = [];
+    const uploadedMedia = [];
     
     // Upload each file to Cloudinary
     for (let file of req.files) {
-      const uploadPromise = new Promise((resolve, reject) => {
-        cloudinary.uploader.upload(
-          file.path,
-          {
-            folder: 'contentflow_media',
-            transformation: [{ width: 1200, crop: 'limit' }]
-          },
-          (error, result) => {
-            // Delete local file after upload
-            fs.unlink(file.path, (unlinkErr) => {
-              if (unlinkErr) console.error('Error deleting local file:', unlinkErr);
-            });
-            
-            if (error) {
-              console.error('Cloudinary upload error:', error);
-              reject(error);
-            } else {
-              // Create new media document
-              const newMedia = new Media({
-                user: req.user.id,
-                url: result.secure_url,
-                publicId: result.public_id,
-                originalname: file.originalname,
-                mimetype: file.mimetype,
-                size: file.size
-              });
-              
-              // Save to database and resolve promise
-              newMedia.save()
-                .then(savedMedia => {
-                  mediaFiles.push(savedMedia);
-                  resolve();
-                })
-                .catch(saveErr => reject(saveErr));
-            }
-          }
-        );
+      console.log(`Uploading: ${file.originalname}`);
+      
+      const result = await cloudinary.uploader.upload(file.path, {
+        folder: 'contentflow/media',
+        transformation: [{ width: 1200, crop: 'limit' }]
       });
       
-      uploadPromises.push(uploadPromise);
+      console.log(`Cloudinary upload successful: ${result.secure_url}`);
+      
+      // Save to database
+      const newMedia = new Media({
+        user: req.user.id,
+        url: result.secure_url,
+        publicId: result.public_id,
+        originalname: file.originalname,
+        mimetype: file.mimetype,
+        size: file.size
+      });
+      
+      const savedMedia = await newMedia.save();
+      uploadedMedia.push(savedMedia);
+      
+      // Delete local file
+      fs.unlink(file.path, (unlinkErr) => {
+        if (unlinkErr) console.error('Error deleting local file:', unlinkErr);
+      });
     }
     
-    // Wait for all uploads to complete
-    await Promise.all(uploadPromises);
+    console.log(`Successfully uploaded ${uploadedMedia.length} files`);
     
     res.json({
       success: true,
-      message: `${req.files.length} file(s) uploaded successfully`,
-      media: mediaFiles
+      message: `${uploadedMedia.length} file(s) uploaded successfully`,
+      media: uploadedMedia
     });
-  } catch (err) {
-    console.error('Error uploading media:', err.message);
     
-    // Delete local files if they exist
-    for (const file of req.files || []) {
-      fs.unlink(file.path, (unlinkErr) => {
-        if (unlinkErr) console.error('Error deleting local file after error:', unlinkErr);
+  } catch (err) {
+    console.error('Error uploading media:', err);
+    
+    // Clean up local files on error
+    if (req.files) {
+      req.files.forEach(file => {
+        fs.unlink(file.path, (unlinkErr) => {
+          if (unlinkErr) console.error('Error deleting local file after error:', unlinkErr);
+        });
       });
     }
     
-    res.status(500).json({ success: false, message: 'Server error during upload' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error during upload',
+      error: err.message
+    });
   }
 });
 

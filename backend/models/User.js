@@ -20,6 +20,14 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: 'default-avatar.png'
   },
+  profilePhoto: {
+    type: String,
+    default: null
+  },
+  profilePhotoPublicId: {
+    type: String,
+    default: null
+  },
   lastLogin: {
     type: Date,
     default: Date.now
@@ -30,9 +38,6 @@ const userSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// Add index for email
-userSchema.index({ email: 1 });
-
 // Method to safely return user data without sensitive information
 userSchema.methods.toJSON = function() {
   const obj = this.toObject();
@@ -40,4 +45,4 @@ userSchema.methods.toJSON = function() {
   return obj;
 };
 
-module.exports = mongoose.model('User', userSchema);
+module.exports = mongoose.models.User || mongoose.model('User', userSchema);

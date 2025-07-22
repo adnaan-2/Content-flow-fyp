@@ -17,6 +17,12 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // For multipart form data, remove Content-Type to let browser set it with boundary
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
+    }
+    
     return config;
   },
   (error) => {
@@ -43,10 +49,11 @@ export const authService = {
   register: (userData) => api.post('/api/auth/register', userData),
   login: (credentials) => api.post('/api/auth/login', credentials),
   getProfile: () => api.get('/api/profile'),
-  updateProfile: (profileData) => api.put('/api/profile', profileData), // Changed from /update to match backend
-  uploadProfileImage: (formData) => api.post('/api/profile/image', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  }),
+  updateProfile: (profileData) => api.put('/api/profile/update', profileData),
+  uploadProfileImage: (formData) => {
+    return api.post('/api/profile/image', formData);
+  },
+  testProfileRoute: () => api.get('/api/profile/test'),
   changePassword: (passwordData) => api.put('/api/profile/change-password', passwordData),
 };
 
@@ -57,9 +64,6 @@ export const mediaService = {
   
   // Upload media files
   uploadMedia: (formData, onUploadProgress) => api.post('/api/media/upload', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data'
-    },
     onUploadProgress
   }),
   
@@ -74,6 +78,12 @@ export const scheduleService = {
   getScheduleById: (id) => api.get(`/api/schedule/${id}`),
   updateSchedule: (id, scheduleData) => api.put(`/api/schedule/${id}`, scheduleData),
   deleteSchedule: (id) => api.delete(`/api/schedule/${id}`),
+};
+
+// Ad generation services
+export const adService = {
+  generateAd: (adData) => api.post('/api/ads/generate', adData),
+  getPresets: () => api.get('/api/ads/presets'),
 };
 
 

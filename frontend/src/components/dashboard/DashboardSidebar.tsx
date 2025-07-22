@@ -98,13 +98,15 @@ const DashboardSidebar = ({ isOpen, toggleSidebar }: DashboardSidebarProps) => {
       
       {isOpen && (
         <div className="mt-auto pb-6 px-4">
-          <Button 
-            variant="default" 
-            className="w-full bg-gradient-to-r from-primary to-primary/80 hover:bg-primary/90 text-primary-foreground flex items-center justify-center gap-2 rounded-xl shadow-md"
-          >
-            <Upload className="h-4 w-4" />
-            <span>Transfer Media</span>
-          </Button>
+          <Link to="/dashboard/import-media">
+            <Button 
+              variant="default" 
+              className="w-full bg-gradient-to-r from-primary to-primary/80 hover:bg-primary/90 text-primary-foreground flex items-center justify-center gap-2 rounded-xl shadow-md"
+            >
+              <Upload className="h-4 w-4" />
+              <span>Import Media</span>
+            </Button>
+          </Link>
         </div>
       )}
     </aside>

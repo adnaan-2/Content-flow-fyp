@@ -32,10 +32,10 @@ app.use(helmet({
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? 'https://yourproductiondomain.com' 
-    : ['http://localhost:3000', 'http://127.0.0.1:3000'],
+    : ['http://localhost:3000', 'http://localhost:3001', 'http://127.0.0.1:3000', 'http://127.0.0.1:3001'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-requested-with', 'Accept', 'Origin', 'Access-Control-Request-Method', 'Access-Control-Request-Headers'],
   exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar']
 }));
 
@@ -80,6 +80,10 @@ app.use('/api/media', mediaRoutes);
 // Add this to your server.js file where you define other routes
 const scheduleRoutes = require('./routes/scheduleRoutes');
 app.use('/api/schedule', scheduleRoutes);
+
+// Add ads routes
+const adRoutes = require('./routes/adRoutes');
+app.use('/api/ads', adRoutes);
 
 // Serve static assets in production
 if (process.env.NODE_ENV === 'production') {
