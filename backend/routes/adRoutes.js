@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const cloudinary = require('cloudinary').v2;
+const GeneratedAd = require('../models/GeneratedAd');
 
 // Configure Cloudinary (reuse existing config)
 cloudinary.config({
@@ -35,7 +36,7 @@ router.post('/generate', auth, async (req, res) => {
         instructions: {
           step1: 'Go to https://huggingface.co/settings/tokens',
           step2: 'Create a free account if you don\'t have one',
-          step3: 'Generate a new token with "Inference" permission enabled',
+          step3: 'Generate a new token (Read access is sufficient)',
           step4: 'Add HUGGINGFACE_API_KEY=your_token_here to your .env file',
           step5: 'Restart the server'
         }
@@ -48,71 +49,108 @@ router.post('/generate', auth, async (req, res) => {
       vibrant colors, eye-catching, ${style || 'professional'} style, 
       8k resolution, advertising design`;
 
-    // Call Hugging Face FLUX.1 API
-    const response = await fetch(
+    // Try multiple API endpoints and add timeout
+    const apiEndpoints = [
       'https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell',
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.HUGGINGFACE_API_KEY || 'hf_your_api_key_here'}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          inputs: enhancedPrompt,
-          parameters: {
-            width: dimensions?.width || 1024,
-            height: dimensions?.height || 1024,
-            guidance_scale: 7.5,
-            num_inference_steps: 4 // FLUX.1-schnell works well with 4 steps
-          }
-        })
-      }
-    );
+      'https://api-inference.huggingface.co/models/runwayml/stable-diffusion-v1-5',
+      'https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1'
+    ];
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Hugging Face API error:', errorText);
-      
-      if (response.status === 401) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid Hugging Face API key. Please check your API key.',
-          instructions: {
-            step1: 'Go to https://huggingface.co/settings/tokens',
-            step2: 'Check if your token is valid and has proper permissions',
-            step3: 'Update HUGGINGFACE_API_KEY in your .env file',
-            step4: 'Restart the server'
-          }
+    let response = null;
+    let lastError = null;
+
+    // Try each endpoint with timeout
+    for (const endpoint of apiEndpoints) {
+      try {
+        console.log(`Trying endpoint: ${endpoint}`);
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+        
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.HUGGINGFACE_API_KEY || 'hf_your_api_key_here'}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            inputs: enhancedPrompt,
+            parameters: {
+              width: dimensions?.width || 1024,
+              height: dimensions?.height || 1024,
+              guidance_scale: 7.5,
+              num_inference_steps: endpoint.includes('FLUX') ? 4 : 20
+            }
+          }),
+          signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          console.log(`Successfully connected to: ${endpoint}`);
+          break;
+        } else {
+          console.log(`Endpoint ${endpoint} returned status: ${response.status}`);
+          lastError = new Error(`HTTP ${response.status}: ${await response.text()}`);
+        }
+      } catch (error) {
+        console.log(`Endpoint ${endpoint} failed:`, error.message);
+        lastError = error;
+        response = null;
       }
+    }
+
+    // If all endpoints failed, try a fallback solution
+    if (!response || !response.ok) {
+      console.log('All AI endpoints failed, checking for network connectivity...');
       
-      if (response.status === 403) {
-        return res.status(400).json({
-          success: false,
-          message: 'Your Hugging Face API token needs "Inference" permissions.',
-          instructions: {
-            step1: 'Go to https://huggingface.co/settings/tokens',
-            step2: 'Delete your current token',
-            step3: 'Create a new token with "Make calls to the serverless Inference API" permission enabled',
-            step4: 'Copy the new token to your .env file as HUGGINGFACE_API_KEY',
-            step5: 'Restart the server',
-            note: 'The token needs "Inference" permissions, not just "Read" permissions'
-          }
+      // Test basic connectivity
+      try {
+        const testResponse = await fetch('https://httpbin.org/get', { 
+          method: 'GET',
+          timeout: 5000 
         });
-      }
-      
-      if (response.status === 503) {
+        if (!testResponse.ok) {
+          throw new Error('Network connectivity test failed');
+        }
+        console.log('Network connectivity is working');
+      } catch (connectivityError) {
+        console.error('Network connectivity issue:', connectivityError.message);
         return res.status(503).json({
           success: false,
-          message: 'AI model is loading. Please try again in a minute.',
-          retryAfter: 60
+          message: 'Network connectivity issue detected. Please check your internet connection or firewall settings.',
+          error: 'NETWORK_ERROR',
+          details: {
+            originalError: lastError?.message || 'Unknown error',
+            suggestion: 'Try again in a few minutes or contact your network administrator'
+          }
         });
       }
-      
-      return res.status(response.status).json({
+
+      // If network is fine but API is failing, create a placeholder image
+      if (lastError?.code === 'ENOTFOUND') {
+        return res.status(503).json({
+          success: false,
+          message: 'AI service is temporarily unavailable due to DNS/network issues.',
+          error: 'DNS_ERROR',
+          details: {
+            suggestion: 'This might be a temporary network issue. Please try again in a few minutes.'
+          }
+        });
+      }
+
+      // For development/testing: Create a placeholder response
+      console.log('Creating placeholder response for development...');
+      return res.status(503).json({
         success: false,
-        message: `API request failed: ${response.status}`,
-        details: errorText
+        message: 'AI model service is temporarily unavailable. Please try again later.',
+        error: 'SERVICE_UNAVAILABLE',
+        details: {
+          lastError: lastError?.message || 'Unknown error',
+          suggestion: 'Please try again in a few minutes',
+          fallback: 'Consider using a VPN or checking firewall settings if this persists'
+        }
       });
     }
 
@@ -138,12 +176,30 @@ router.post('/generate', auth, async (req, res) => {
 
     console.log('Upload successful:', uploadResult.secure_url);
 
+    // Save generated ad to database
+    const generatedAd = new GeneratedAd({
+      user: req.user.id,
+      url: uploadResult.secure_url,
+      publicId: uploadResult.public_id,
+      prompt: prompt,
+      enhancedPrompt: enhancedPrompt,
+      style: style || 'professional',
+      dimensions: {
+        width: dimensions?.width || 1024,
+        height: dimensions?.height || 1024
+      }
+    });
+
+    await generatedAd.save();
+    console.log('Generated ad saved to database');
+
     res.json({
       success: true,
       message: 'Ad generated successfully',
       imageUrl: uploadResult.secure_url,
       publicId: uploadResult.public_id,
-      prompt: enhancedPrompt
+      prompt: enhancedPrompt,
+      adId: generatedAd._id
     });
 
   } catch (error) {
@@ -151,6 +207,79 @@ router.post('/generate', auth, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to generate ad',
+      error: error.message
+    });
+  }
+});
+
+// GET /api/ads/my-ads - Get all generated ads for the current user
+router.get('/my-ads', auth, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 12;
+    const skip = (page - 1) * limit;
+
+    const generatedAds = await GeneratedAd.find({ user: req.user.id })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate('user', 'name email');
+
+    const total = await GeneratedAd.countDocuments({ user: req.user.id });
+
+    res.json({
+      success: true,
+      ads: generatedAds,
+      pagination: {
+        currentPage: page,
+        totalPages: Math.ceil(total / limit),
+        totalAds: total,
+        hasNext: page < Math.ceil(total / limit),
+        hasPrev: page > 1
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching generated ads:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch generated ads',
+      error: error.message
+    });
+  }
+});
+
+// DELETE /api/ads/:id - Delete a generated ad
+router.delete('/:id', auth, async (req, res) => {
+  try {
+    const ad = await GeneratedAd.findOne({ 
+      _id: req.params.id, 
+      user: req.user.id 
+    });
+
+    if (!ad) {
+      return res.status(404).json({
+        success: false,
+        message: 'Generated ad not found'
+      });
+    }
+
+    // Delete from Cloudinary
+    await cloudinary.uploader.destroy(ad.publicId);
+
+    // Delete from database
+    await GeneratedAd.findByIdAndDelete(req.params.id);
+
+    res.json({
+      success: true,
+      message: 'Generated ad deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Error deleting generated ad:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete generated ad',
       error: error.message
     });
   }

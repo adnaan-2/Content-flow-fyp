@@ -84,6 +84,8 @@ export const scheduleService = {
 export const adService = {
   generateAd: (adData) => api.post('/api/ads/generate', adData),
   getPresets: () => api.get('/api/ads/presets'),
+  getMyAds: (page = 1, limit = 12) => api.get(`/api/ads/my-ads?page=${page}&limit=${limit}`),
+  deleteAd: (id) => api.delete(`/api/ads/${id}`),
 };
 
 

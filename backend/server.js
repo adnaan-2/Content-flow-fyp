@@ -85,6 +85,10 @@ app.use('/api/schedule', scheduleRoutes);
 const adRoutes = require('./routes/adRoutes');
 app.use('/api/ads', adRoutes);
 
+// Add social media routes
+// const socialMediaRoutes = require('./routes/socialMediaRoutes');
+// app.use('/api/social', socialMediaRoutes);
+
 // Serve static assets in production
 if (process.env.NODE_ENV === 'production') {
   // Set static folder
