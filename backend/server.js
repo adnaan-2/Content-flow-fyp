@@ -81,9 +81,14 @@ app.use('/api/media', mediaRoutes);
 const scheduleRoutes = require('./routes/scheduleRoutes');
 app.use('/api/schedule', scheduleRoutes);
 
+
 // Add ads routes
 const adRoutes = require('./routes/adRoutes');
 app.use('/api/ads', adRoutes);
+
+// // Add caption routes
+// const captionRoutes = require('./routes/captionRoutes');
+// app.use('/api/caption', captionRoutes);
 
 // Add social media routes
 // const socialMediaRoutes = require('./routes/socialMediaRoutes');

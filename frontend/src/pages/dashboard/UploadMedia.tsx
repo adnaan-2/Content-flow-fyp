@@ -1,299 +1,311 @@
+import { useState, useEffect } from "react";
 
-import { useState, ChangeEvent } from "react";
+import { mediaService, adService } from '@/services/api';
+
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-
-import { Upload, Plus, X, ImageIcon, Video, CheckCircle } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import Calendar from 'react-calendar';
+import 'react-calendar/dist/Calendar.css';
 import { Separator } from "@/components/ui/separator";
+import { CheckCircle, Plus } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 
-type MediaType = "image" | "video";
-
-interface MediaFile {
-  id: string;
-  file: File;
-  type: MediaType;
-  preview: string;
-}
+const platforms = [
+  { id: "facebook", name: "Facebook", color: "#4267B2" },
+  { id: "instagram", name: "Instagram", color: "#E1306C" },
+  { id: "twitter", name: "Twitter", color: "#1DA1F2" },
+  { id: "tiktok", name: "TikTok", color: "#000000" },
+];
 
 const UploadMedia = () => {
-  const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
-  const [caption, setCaption] = useState("");
+  const [mediaFiles, setMediaFiles] = useState<any[]>([]);
+  const [importedMedia, setImportedMedia] = useState<any[]>([]);
+  const [generatedMedia, setGeneratedMedia] = useState<any[]>([]);
+  const [selectedImages, setSelectedImages] = useState<string[]>([]); // store _id or unique id
+  const [generatedImage, setGeneratedImage] = useState<any>(null);
+  const [caption, setCaption] = useState('');
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
+  const [showScheduleDialog, setShowScheduleDialog] = useState(false);
+  const [scheduledDate, setScheduledDate] = useState(new Date());
+  const [scheduledTime, setScheduledTime] = useState("10:00");
 
-  const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-    
-    const files = Array.from(e.target.files);
-    const newMediaFiles: MediaFile[] = [];
-    
-    files.forEach(file => {
-      // Check if file is an image or video
-      const isImage = file.type.startsWith("image/");
-      const isVideo = file.type.startsWith("video/");
-      
-      if (isImage || isVideo) {
-        const id = `${Date.now()}-${file.name}`;
-        const type: MediaType = isImage ? "image" : "video";
-        const preview = URL.createObjectURL(file);
-        
-        newMediaFiles.push({
-          id,
-          file,
-          type,
-          preview
-        });
-      }
-    });
-    
-    setMediaFiles([...mediaFiles, ...newMediaFiles]);
-  };
-  
-  const removeMedia = (id: string) => {
-    setMediaFiles(mediaFiles.filter(media => media.id !== id));
-  };
-  
+  // Fetch imported media from Cloudinary on mount
+  useEffect(() => {
+    const fetchMedia = async () => {
+      try {
+        const response = await mediaService.getAllMedia();
+        setImportedMedia(response.data.media || []);
+      } catch (err) {}
+    };
+    const fetchGenerated = async () => {
+      try {
+        const response = await adService.getMyAds(1, 12);
+        setGeneratedMedia(response.data.ads || []);
+      } catch (err) {}
+    };
+    fetchMedia();
+    fetchGenerated();
+  }, []);
+
+  // Platform selection
   const togglePlatformSelection = (platform: string) => {
-    if (selectedPlatforms.includes(platform)) {
-      setSelectedPlatforms(selectedPlatforms.filter(p => p !== platform));
-    } else {
-      setSelectedPlatforms([...selectedPlatforms, platform]);
-    }
+    setSelectedPlatforms(selectedPlatforms.includes(platform)
+      ? selectedPlatforms.filter(p => p !== platform)
+      : [...selectedPlatforms, platform]
+    );
   };
-  
-  const handleSubmit = () => {
-    if (mediaFiles.length === 0) {
-      toast({
-        title: "No media selected",
-        description: "Please upload at least one image or video.",
-        variant: "destructive"
-      });
+
+  // Post Now
+  const handlePostNow = () => {
+    if ((mediaFiles.length === 0 && !generatedImage) || selectedPlatforms.length === 0) {
+      toast({ title: "Select media and platforms", variant: "destructive" });
       return;
     }
-    
-    if (selectedPlatforms.length === 0) {
-      toast({
-        title: "No platforms selected",
-        description: "Please select at least one platform to post to.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    toast({
-      title: "Content prepared for upload!",
-      description: `Content will be published to ${selectedPlatforms.join(", ")}.`,
-    });
-    
-    // Reset form (in a real app, you'd likely upload the files to a server here)
-    setMediaFiles([]);
-    setCaption("");
-    setSelectedPlatforms([]);
+    toast({ title: "Posted!", description: `Posted to ${selectedPlatforms.join(", ")}` });
   };
-  
-  const platforms = [
-    { id: "facebook", name: "Facebook", color: "#4267B2" },
-    { id: "instagram", name: "Instagram", color: "#E1306C" },
-    { id: "twitter", name: "Twitter", color: "#1DA1F2" },
-    { id: "tiktok", name: "TikTok", color: "#000000" },
-  ];
+
+  // Schedule Post
+  const handleSchedulePost = () => {
+    setShowScheduleDialog(false);
+    toast({ title: "Post scheduled!", description: `Scheduled for ${scheduledDate} at ${scheduledTime}` });
+  };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Upload Media</h1>
-        <p className="text-muted-foreground">
-          Create and publish content across your social media platforms
-        </p>
-      </div>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Upload Media</CardTitle>
-              <CardDescription>
-                Upload images or videos to share on your social platforms
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div 
-                className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:bg-muted/50 transition-colors"
-                onClick={() => document.getElementById("file-upload")?.click()}
-              >
-                <div className="flex flex-col items-center justify-center gap-2">
-                  <Upload className="h-10 w-10 text-muted-foreground" />
-                  <h3 className="font-medium">Drag & Drop or Click to Upload</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Support for images (PNG, JPG) and videos (MP4) up to 100MB
-                  </p>
-                </div>
-                <input 
-                  type="file" 
-                  id="file-upload" 
-                  className="hidden" 
-                  multiple 
-                  accept="image/*,video/*"
-                  onChange={handleFileUpload}
-                />
-              </div>
-              
-              {mediaFiles.length > 0 && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  {mediaFiles.map(media => (
-                    <div key={media.id} className="relative group">
-                      <div className="aspect-square rounded-md overflow-hidden border bg-muted">
-                        {media.type === "image" ? (
-                          <img 
-                            src={media.preview} 
-                            alt="Preview" 
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Video className="h-10 w-10 text-muted-foreground" />
-                          </div>
-                        )}
-                      </div>
-                      <button
-                        className="absolute top-2 right-2 bg-black/70 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => removeMedia(media.id)}
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                      <div className="mt-1 text-xs truncate">
-                        {media.file.name}
-                      </div>
-                    </div>
-                  ))}
-                  <div 
-                    className="border-2 border-dashed rounded-md flex items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors aspect-square"
-                    onClick={() => document.getElementById("file-upload")?.click()}
+    <div className="space-y-8">
+      <h1 className="text-3xl font-bold tracking-tight">Upload & Generate Media</h1>
+      <p className="text-muted-foreground mb-4">Import media, generate content, and post to social platforms.</p>
+
+      {/* Images Section */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+        {/* Imported Media */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Imported Media</CardTitle>
+          </CardHeader>
+          <CardContent className="max-h-80 overflow-y-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {importedMedia.map(file => {
+                const selectedIdx = selectedImages.indexOf(file._id);
+                return (
+                  <div
+                    className={`border rounded-lg overflow-hidden bg-card cursor-pointer relative group ${selectedIdx !== -1 ? 'ring-2 ring-primary' : ''}`}
+                    key={file._id}
                   >
-                    <Plus className="h-6 w-6 text-muted-foreground" />
+                    <div className="relative aspect-square bg-muted">
+                      <img 
+                        src={file.url} 
+                        alt={file.originalname || 'Media file'}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                        onError={e => (e.currentTarget.src = "/placeholder-image.png")}
+                        onClick={() => {
+                          setSelectedImages(selectedImages.includes(file._id)
+                            ? selectedImages.filter(id => id !== file._id)
+                            : [...selectedImages, file._id]);
+                        }}
+                      />
+                      {selectedIdx !== -1 && (
+                        <div className="absolute top-2 right-2 bg-primary text-white rounded-full px-2 py-1 text-xs group-hover:scale-110 transition-transform" title={`Selected #${selectedIdx+1}`}>{selectedIdx+1}</div>
+                      )}
+                    </div>
+                    <div className="mt-1 text-xs truncate">{file.originalname}</div>
                   </div>
-                </div>
-              )}
-              
-              <Textarea
-                placeholder="Write a caption for your post..."
-                className="min-h-32"
-                value={caption}
-                onChange={(e) => setCaption(e.target.value)}
-              />
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Post Settings</CardTitle>
-              <CardDescription>
-                Configure additional settings for your post
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <label className="text-sm font-medium mb-2 block">
-                  Schedule Post
-                </label>
-                <div className="flex gap-4">
-                  <Select defaultValue="now">
-                    <SelectTrigger>
-                      <SelectValue placeholder="When to publish" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="now">Publish now</SelectItem>
-                      <SelectItem value="schedule">Schedule for later</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  
-                  <Input type="datetime-local" className="w-auto" />
-                </div>
-              </div>
-              
-              <div>
-                <label className="text-sm font-medium mb-2 block">
-                  Add Location
-                </label>
-                <Input placeholder="Add a location" />
-              </div>
-              
-              <div>
-                <label className="text-sm font-medium mb-2 block">
-                  Hashtags
-                </label>
-                <Input placeholder="Enter hashtags separated by spaces" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-        
-        <div>
-          <Card>
-            <CardHeader>
-              <CardTitle>Select Platforms</CardTitle>
-              <CardDescription>
-                Choose where to publish your content
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {platforms.map((platform) => (
-                <div key={platform.id}>
-                  <button
-                    className={`flex items-center gap-3 w-full p-3 rounded-md transition-colors ${
-                      selectedPlatforms.includes(platform.id) 
-                        ? "bg-primary/10" 
-                        : "hover:bg-muted"
-                    }`}
-                    onClick={() => togglePlatformSelection(platform.id)}
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Generated Media */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Generated Media</CardTitle>
+          </CardHeader>
+          <CardContent className="max-h-80 overflow-y-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {generatedMedia.map(gen => {
+                const selectedIdx = selectedImages.indexOf(gen._id);
+                return (
+                  <div
+                    className={`border rounded-lg overflow-hidden bg-card cursor-pointer relative group ${selectedIdx !== -1 ? 'ring-2 ring-primary' : ''}`}
+                    key={gen._id}
                   >
-                    <div 
-                      className="h-8 w-8 rounded-full flex items-center justify-center"
-                      style={{ backgroundColor: `${platform.color}20` }}
-                    >
-                      <span style={{ color: platform.color }} className="text-lg font-bold">
-                        {platform.name[0]}
-                      </span>
+                    <div className="relative aspect-square bg-muted">
+                      <img 
+                        src={gen.url || gen.imageUrl} 
+                        alt={gen.prompt || 'Generated Ad'}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                        onError={e => (e.currentTarget.src = "/placeholder-image.png")}
+                        onClick={() => {
+                          setSelectedImages(selectedImages.includes(gen._id)
+                            ? selectedImages.filter(id => id !== gen._id)
+                            : [...selectedImages, gen._id]);
+                        }}
+                      />
+                      {selectedIdx !== -1 && (
+                        <div className="absolute top-2 right-2 bg-primary text-white rounded-full px-2 py-1 text-xs group-hover:scale-110 transition-transform" title={`Selected #${selectedIdx+1}`}>{selectedIdx+1}</div>
+                      )}
                     </div>
-                    <span className="font-medium">{platform.name}</span>
-                    {selectedPlatforms.includes(platform.id) && (
-                      <CheckCircle className="ml-auto h-4 w-4 text-primary" />
-                    )}
-                  </button>
-                  {platform.id !== platforms[platforms.length - 1].id && <Separator className="my-2" />}
-                </div>
-              ))}
-            </CardContent>
-            <CardFooter>
-              <Button 
-                className="w-full"
-                disabled={mediaFiles.length === 0 || selectedPlatforms.length === 0}
-                onClick={handleSubmit}
-              >
-                {selectedPlatforms.length === 0 
-                  ? "Select Platforms to Post" 
-                  : `Post to ${selectedPlatforms.length} Platform${selectedPlatforms.length > 1 ? "s" : ""}`}
-              </Button>
-            </CardFooter>
-          </Card>
-        </div>
+                    <div className="mt-1 text-xs truncate">{gen.prompt || 'Generated Ad'}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Caption & Social Selection Section */}
+      <div className="flex flex-col md:flex-row gap-8 mb-8">
+        {/* Caption Input & Post Buttons */}
+        <Card className="flex-1">
+          <CardHeader>
+            <CardTitle>Caption</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Textarea
+              value={caption}
+              onChange={e => setCaption(e.target.value)}
+              placeholder="Write your caption..."
+              rows={5}
+              className="mb-2"
+            />
+            <div className="flex gap-2">
+                <Button
+                  className="flex-1"
+                  disabled={selectedImages.length === 0 || selectedPlatforms.length === 0}
+                  onClick={handlePostNow}
+                >
+                  Post Now
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  disabled={selectedImages.length === 0 || selectedPlatforms.length === 0}
+                  onClick={() => setShowScheduleDialog(true)}
+                >
+                  Post Later
+                </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Social Media Selection */}
+        <Card className="flex-1">
+          <CardHeader>
+            <CardTitle>Select Platforms</CardTitle>
+            <CardDescription>Choose where to publish your content</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {platforms.map((platform) => (
+              <div key={platform.id}>
+                <button
+                  className={`flex items-center gap-3 w-full p-3 rounded-md transition-colors ${
+                    selectedPlatforms.includes(platform.id) 
+                      ? "bg-primary/10" 
+                      : "hover:bg-muted"
+                  }`}
+                  onClick={() => togglePlatformSelection(platform.id)}
+                >
+                  <div 
+                    className="h-8 w-8 rounded-full flex items-center justify-center"
+                    style={{ backgroundColor: `${platform.color}20` }}
+                  >
+                    <span style={{ color: platform.color }} className="text-lg font-bold">
+                      {platform.name[0]}
+                    </span>
+                  </div>
+                  <span className="font-medium">{platform.name}</span>
+                  {selectedPlatforms.includes(platform.id) && (
+                    <CheckCircle className="ml-auto h-4 w-4 text-primary" />
+                  )}
+                </button>
+                {platform.id !== platforms[platforms.length - 1].id && <Separator className="my-2" />}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Schedule Dialog */}
+      <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Schedule Your Post</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-6 py-4">
+            <div className="flex flex-col items-center gap-2">
+              <Label style={{ color: '#fff' }}>Date</Label>
+              <div style={{ background: '#181818', borderRadius: '1rem', padding: '1rem', border: '2px solid #222' }}>
+                <Calendar
+                  value={scheduledDate}
+                  onChange={value => {
+                    if (value instanceof Date) setScheduledDate(value);
+                    else if (Array.isArray(value) && value[0] instanceof Date) setScheduledDate(value[0]);
+                  }}
+                  className="rounded-lg border shadow-md w-full"
+                  calendarType="gregory"
+                />
+                <style>{`
+                  .react-calendar {
+                    background: #181818 !important;
+                    color: #fff !important;
+                    border-radius: 1rem !important;
+                    border: 2px solid #222 !important;
+                  }
+                  .react-calendar__tile {
+                    background: #181818 !important;
+                    color: #fff !important;
+                    border-radius: 50% !important;
+                  }
+                  .react-calendar__tile--active, .react-calendar__tile--now {
+                    background: #222 !important;
+                    color: #fff !important;
+                  }
+                  .react-calendar__navigation {
+                    background: #181818 !important;
+                    color: #fff !important;
+                  }
+                  .react-calendar__month-view__weekdays {
+                    color: #fff !important;
+                  }
+                  .react-calendar__tile:disabled {
+                    background: #222 !important;
+                    color: #888 !important;
+                  }
+                `}</style>
+              </div>
+            </div>
+            <div className="flex flex-col items-center gap-2">
+              <Label style={{ color: '#fff' }}>Time</Label>
+              <div style={{ width: '200px', position: 'relative' }}>
+                <input
+                  type="time"
+                  value={scheduledTime}
+                  onChange={e => setScheduledTime(e.target.value)}
+                  style={{ background: '#222', color: '#fff', border: '2px solid #444', fontWeight: 600, fontSize: '1.3em', textAlign: 'center', borderRadius: '0.5em', width: '100%', padding: '0.4em 2.5em 0.4em 0.4em' }}
+                />
+                <style>{`
+                  input[type="time"]::-webkit-calendar-picker-indicator {
+                    filter: invert(1) brightness(2);
+                  }
+                  input[type="time"]::-ms-input-placeholder {
+                    color: #fff;
+                  }
+                  input[type="time"]::placeholder {
+                    color: #fff;
+                  }
+                `}</style>
+              </div>
+            </div>
+            <Button onClick={handleSchedulePost} className="w-full">Schedule</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
