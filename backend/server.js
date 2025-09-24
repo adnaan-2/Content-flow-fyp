@@ -91,8 +91,8 @@ app.use('/api/ads', adRoutes);
 // app.use('/api/caption', captionRoutes);
 
 // Add social media routes
-// const socialMediaRoutes = require('./routes/socialMediaRoutes');
-// app.use('/api/social', socialMediaRoutes);
+const socialMediaRoutes = require('./routes/socialMedia');
+app.use('/api/social-media', socialMediaRoutes);
 
 // Serve static assets in production
 if (process.env.NODE_ENV === 'production') {

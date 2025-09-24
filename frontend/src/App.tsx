@@ -22,6 +22,7 @@ import Profile from "./pages/dashboard/Profile";
 import Settings from "./pages/dashboard/Settings";
 import Subscription from "./pages/dashboard/Subscription";
 import ImportMedia from './pages/dashboard/ImportMedia';
+import AuthCallback from "./pages/AuthCallback";
 
 function App() {
   return (
@@ -33,6 +34,9 @@ function App() {
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            
+            {/* Auth Callback Route */}
+            <Route path="/auth/callback" element={<AuthCallback />} />
             
             {/* Protected Dashboard Routes with Layout */}
             <Route 

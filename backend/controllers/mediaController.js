@@ -1,9 +1,5 @@
-const express = require('express');
-const router = express.Router();
-const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const Media = require('../models/media');
-const { authenticateToken } = require('../middleware/auth');
 const streamifier = require('streamifier');
 
 // Configure Cloudinary
@@ -13,28 +9,8 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET || 'pR-MvTUpcys5iYG5grvvU_8phoM'
 });
 
-// Use memory storage instead of disk storage
-const storage = multer.memoryStorage();
-
-// Set up multer upload with memory storage
-const upload = multer({
-  storage: storage,
-  limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB limit
-  },
-  fileFilter: (req, file, cb) => {
-    // Check file types
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/svg+xml', 'image/webp'];
-    if (allowedTypes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Invalid file type. Only images are allowed.'), false);
-    }
-  }
-});
-
-// GET /api/media - Get all media files for a user
-router.get('/', authenticateToken, async (req, res) => {
+// Get all media files for a user
+exports.getAllMedia = async (req, res) => {
   try {
     const media = await Media.find({ user: req.user.id })
       .sort({ createdAt: -1 }); // Newest first
@@ -44,10 +20,10 @@ router.get('/', authenticateToken, async (req, res) => {
     console.error('Error fetching media:', err.message);
     res.status(500).json({ success: false, message: 'Server error' });
   }
-});
+};
 
-// POST /api/media/upload - Upload media directly to Cloudinary
-router.post('/upload', authenticateToken, upload.array('media', 10), async (req, res) => {
+// Upload media files directly to Cloudinary without local storage
+exports.uploadMedia = async (req, res) => {
   console.log('Media upload route hit');
   console.log('Files received:', req.files?.length || 0);
   
@@ -114,10 +90,10 @@ router.post('/upload', authenticateToken, upload.array('media', 10), async (req,
       error: err.message
     });
   }
-});
+};
 
-// DELETE /api/media/:id - Delete media file
-router.delete('/:id', authenticateToken, async (req, res) => {
+// Delete media file
+exports.deleteMedia = async (req, res) => {
   try {
     const media = await Media.findOne({
       _id: req.params.id,
@@ -141,6 +117,4 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     console.error('Error deleting media:', err.message);
     res.status(500).json({ success: false, message: 'Server error' });
   }
-});
-
-module.exports = router;
+};

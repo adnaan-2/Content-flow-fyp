@@ -2,10 +2,10 @@ const express = require('express');
 const router = express.Router();
 const Schedule = require('../models/schedule');
 const Media = require('../models/media');
-const auth = require('../middleware/auth');
+const { authenticateToken } = require('../middleware/auth');
 
 // GET /api/schedule - Get all scheduled posts for a user
-router.get('/', auth, async (req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
   try {
     const schedules = await Schedule.find({ user: req.user.id })
       .sort({ scheduledDateTime: 1 })
@@ -19,7 +19,7 @@ router.get('/', auth, async (req, res) => {
 });
 
 // POST /api/schedule - Create a new scheduled post
-router.post('/', auth, async (req, res) => {
+router.post('/', authenticateToken, async (req, res) => {
   try {
     const { mediaId, scheduledDateTime, platforms, caption } = req.body;
     
@@ -71,7 +71,7 @@ router.post('/', auth, async (req, res) => {
 });
 
 // DELETE /api/schedule/:id - Delete a scheduled post
-router.delete('/:id', auth, async (req, res) => {
+router.delete('/:id', authenticateToken, async (req, res) => {
   try {
     const schedule = await Schedule.findOne({
       _id: req.params.id,
