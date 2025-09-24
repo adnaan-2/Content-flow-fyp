@@ -56,7 +56,26 @@ const Login = () => {
       
       navigate("/dashboard", { replace: true });
     } catch (err: any) {
-      const errorMessage = err.response?.data?.message || "Login failed. Please check your credentials.";
+      const errorData = err.response?.data;
+      
+      if (errorData?.requiresVerification) {
+        // User needs to verify email
+        toast({
+          title: "Email verification required",
+          description: "Please verify your email before logging in",
+          variant: "destructive",
+        });
+        
+        navigate("/verify-email", {
+          state: {
+            userId: errorData.userId,
+            email: errorData.email
+          }
+        });
+        return;
+      }
+      
+      const errorMessage = errorData?.message || "Login failed. Please check your credentials.";
       
       toast({
         title: "Login failed",

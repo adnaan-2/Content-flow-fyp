@@ -261,7 +261,7 @@ const SchedulePosts = () => {
                     <CardContent className="p-4">
                       <p>{post.content}</p>
                       {post.media && (
-                        <img 
+                        <img  
                           src={post.media} 
                           alt="Post media" 
                           className="mt-2 rounded-md max-h-40 object-cover" 

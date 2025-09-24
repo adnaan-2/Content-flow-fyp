@@ -28,6 +28,18 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  isVerified: {
+    type: Boolean,
+    default: false
+  },
+  verificationCode: {
+    type: String,
+    default: null
+  },
+  verificationCodeExpires: {
+    type: Date,
+    default: null
+  },
   lastLogin: {
     type: Date,
     default: Date.now

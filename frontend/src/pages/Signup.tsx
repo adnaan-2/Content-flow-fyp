@@ -50,21 +50,33 @@ const Signup = () => {
       // Call the real API endpoint
       const response = await authService.register(signupData);
       
-      // Store token and user data
-      localStorage.setItem("token", response.data.token);
-      localStorage.setItem("user", JSON.stringify(response.data.user));
-      
-      // Show success toast
-      toast({
-        title: "Registration successful!",
-        description: "Your account has been created",
-      });
-      
-      // Navigate to login with success message
-      navigate("/login", { 
-        state: { message: "Registration successful! You can now log in." },
-        replace: true 
-      });
+      if (response.data.requiresVerification) {
+        // Show success toast
+        toast({
+          title: "Registration successful!",
+          description: "Please check your email for verification code",
+        });
+        
+        // Navigate to email verification page
+        navigate("/verify-email", { 
+          state: { 
+            userId: response.data.userId,
+            email: response.data.email
+          },
+          replace: true 
+        });
+      } else {
+        // Old flow (in case verification is disabled)
+        localStorage.setItem("token", response.data.token);
+        localStorage.setItem("user", JSON.stringify(response.data.user));
+        
+        toast({
+          title: "Registration successful!",
+          description: "Your account has been created",
+        });
+        
+        navigate("/dashboard", { replace: true });
+      }
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || "Registration failed. Please try again.";
       setError(errorMessage);
