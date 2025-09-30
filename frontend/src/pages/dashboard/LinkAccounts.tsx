@@ -19,6 +19,10 @@ export default function LinkAccounts() {
   const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null);
   const [connectionSuccess, setConnectionSuccess] = useState<string | null>(null);
   const [fetchingAccounts, setFetchingAccounts] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [showError, setShowError] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
 
   const socialPlatforms = [
     {
@@ -69,6 +73,53 @@ export default function LinkAccounts() {
 
   useEffect(() => {
     fetchConnectedAccounts();
+    
+    // Listen for localStorage changes (fallback for CORS issues)
+    const handleStorageChange = () => {
+      const authResult = localStorage.getItem('auth_result');
+      if (authResult) {
+        try {
+          const result = JSON.parse(authResult);
+          // Only process if it's recent (within last 30 seconds)
+          if (Date.now() - result.timestamp < 30000) {
+
+            
+            if (result.type === 'AUTH_SUCCESS') {
+              setSuccessMessage(`${result.platform} account connected successfully!`);
+              setShowSuccess(true);
+              
+              if (result.account) {
+                setConnectedAccounts(prev => {
+                  const filtered = prev.filter(acc => acc.platform !== result.platform);
+                  return [...filtered, result.account];
+                });
+              } else {
+                fetchConnectedAccounts();
+              }
+              
+              setTimeout(() => setShowSuccess(false), 3000);
+            }
+            
+            // Clear the result
+            localStorage.removeItem('auth_result');
+          }
+        } catch (e) {
+          console.error('Failed to parse auth result:', e);
+        }
+      }
+    };
+    
+    // Check immediately and then listen for changes
+    handleStorageChange();
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also check periodically in case storage event doesn't fire
+    const interval = setInterval(handleStorageChange, 2000);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
   }, []);
 
   const fetchConnectedAccounts = async () => {
@@ -130,45 +181,108 @@ export default function LinkAccounts() {
           const popup = window.open(
             data.authUrl,
             'social-auth',
-            'width=600,height=700,scrollbars=yes,resizable=yes'
+            'width=600,height=700,scrollbars=yes,resizable=yes,noopener=no,noreferrer=no'
           );
 
-          // Listen for popup messages
+          // Polling method as fallback for Cross-Origin-Opener-Policy issues
+          let pollTimer: NodeJS.Timeout;
+          
+          const pollPopup = () => {
+            try {
+              if (popup?.closed) {
+                clearInterval(pollTimer);
+                console.log('Popup was closed, refreshing accounts...');
+                // Wait a moment and then refresh accounts
+                setTimeout(() => {
+                  fetchConnectedAccounts();
+                  setConnectingPlatform(null);
+                  setLoading(false);
+                }, 1000);
+                return;
+              }
+              
+              // Try to check if popup URL changed (will fail due to CORS, but that's expected)
+              try {
+                const popupUrl = popup?.location?.href;
+                if (popupUrl && popupUrl.includes('/auth/callback')) {
+                  console.log('Detected callback URL, refreshing accounts...');
+                  popup?.close();
+                  clearInterval(pollTimer);
+                  setTimeout(() => {
+                    fetchConnectedAccounts();
+                    setConnectingPlatform(null);
+                    setLoading(false);
+                  }, 1000);
+                }
+              } catch (e) {
+                // Expected CORS error, ignore
+              }
+            } catch (error) {
+              // Expected error due to CORS
+            }
+          };
+          
+          // Start polling every 1 second
+          pollTimer = setInterval(pollPopup, 1000);
+
+          // Listen for popup messages (backup method)
           const handleMessage = (event: MessageEvent) => {
             if (event.origin !== window.location.origin) return;
             
-            if (event.data.type === 'SOCIAL_AUTH_SUCCESS') {
-              popup?.close();
-              setLoading(false);
-              setConnectingPlatform(null);
-              setConnectionSuccess(`${platform} account connected successfully!`);
+            const { type, platform, message, account, accounts, error } = event.data;
+            
+            if (type === 'AUTH_SUCCESS') {
+              // Show success notification
+              setSuccessMessage(`${platform} account connected successfully!`);
+              setShowSuccess(true);
               
-              // Immediately refresh accounts
-              fetchConnectedAccounts();
+              // If multiple accounts are provided (like Facebook + pages), update all at once
+              if (accounts && Array.isArray(accounts)) {
+                setConnectedAccounts(accounts);
+              } else if (account) {
+                // Single account update
+                setConnectedAccounts(prev => {
+                  const filtered = prev.filter(acc => acc.platform !== platform);
+                  return [...filtered, account];
+                });
+              } else {
+                // Fallback: refresh all accounts from server
+                fetchConnectedAccounts();
+              }
               
-              // Clear success message after 3 seconds
-              setTimeout(() => setConnectionSuccess(null), 3000);
+              // Auto-hide success message after 3 seconds
+              setTimeout(() => setShowSuccess(false), 3000);
               
-              window.removeEventListener('message', handleMessage);
-            } else if (event.data.type === 'SOCIAL_AUTH_ERROR') {
-              popup?.close();
-              setLoading(false);
-              setConnectingPlatform(null);
-              window.removeEventListener('message', handleMessage);
+            } else if (type === 'AUTH_ERROR') {
+              console.error(`${platform} connection failed:`, error);
+              setErrorMessage(`Failed to connect ${platform}: ${error}`);
+              setShowError(true);
+              
+              // Auto-hide error message after 5 seconds
+              setTimeout(() => setShowError(false), 5000);
             }
+            
+            setConnectingPlatform(null);
+            setLoading(false);
           };
 
           window.addEventListener('message', handleMessage);
 
-          // Fallback: check if popup is closed
+          // Enhanced popup monitoring
           const checkClosed = setInterval(() => {
             if (popup?.closed) {
               clearInterval(checkClosed);
               setLoading(false);
               setConnectingPlatform(null);
               window.removeEventListener('message', handleMessage);
+              
               // Refresh accounts after potential connection
-              setTimeout(() => fetchConnectedAccounts(), 1000);
+              setTimeout(() => {
+                fetchConnectedAccounts();
+                setSuccessMessage(`${platform} authentication completed. Checking for new connections...`);
+                setShowSuccess(true);
+                setTimeout(() => setShowSuccess(false), 3000);
+              }, 1500);
             }
           }, 1000);
 
@@ -445,28 +559,6 @@ export default function LinkAccounts() {
           })}
         </div>
 
-        {/* Info Section */}
-        <div className="mt-12 text-center">
-          <div className="bg-gray-900/30 border border-gray-800 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-white mb-3">
-              Why Connect Your Accounts?
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-400">
-              <div>
-                <div className="text-blue-400 mb-1">📊</div>
-                <p>Unified analytics and insights across all platforms</p>
-              </div>
-              <div>
-                <div className="text-green-400 mb-1">⏰</div>
-                <p>Schedule posts to multiple accounts simultaneously</p>
-              </div>
-              <div>
-                <div className="text-purple-400 mb-1">🎯</div>
-                <p>Streamlined content management and publishing</p>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );
