@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { Separator } from "@/components/ui/separator";
-import { CheckCircle, Plus } from "lucide-react";
+import { CheckCircle, Plus, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 
 const platforms = [
@@ -31,6 +31,7 @@ const UploadMedia = () => {
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [scheduledDate, setScheduledDate] = useState(new Date());
   const [scheduledTime, setScheduledTime] = useState("10:00");
+  const [isGeneratingCaption, setIsGeneratingCaption] = useState(false);
 
   // Fetch imported media from Cloudinary on mount
   useEffect(() => {
@@ -71,6 +72,61 @@ const UploadMedia = () => {
   const handleSchedulePost = () => {
     setShowScheduleDialog(false);
     toast({ title: "Post scheduled!", description: `Scheduled for ${scheduledDate} at ${scheduledTime}` });
+  };
+
+  // AI Caption Generation
+  const handleGenerateCaption = async () => {
+    if (selectedImages.length === 0) {
+      toast({ 
+        title: "Select images first", 
+        description: "Please select at least one image to generate a caption",
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    setIsGeneratingCaption(true);
+    try {
+      // Get selected images data
+      const selectedImagesData = [...importedMedia, ...generatedMedia].filter(item => 
+        selectedImages.includes(item._id)
+      );
+
+      const response = await fetch('/api/caption/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          images: selectedImagesData,
+          platforms: selectedPlatforms,
+          currentCaption: caption
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate caption');
+      }
+
+      const data = await response.json();
+      setCaption(data.caption);
+      
+      toast({ 
+        title: "Caption generated!", 
+        description: "AI has created a caption for your selected images" 
+      });
+    } catch (error) {
+      console.error('Caption generation error:', error);
+      toast({ 
+        title: "Generation failed", 
+        description: error.message || "Could not generate caption. Please try again.",
+        variant: "destructive" 
+      });
+    } finally {
+      setIsGeneratingCaption(false);
+    }
   };
 
   return (
@@ -167,13 +223,33 @@ const UploadMedia = () => {
             <CardTitle>Caption</CardTitle>
           </CardHeader>
           <CardContent>
-            <Textarea
-              value={caption}
-              onChange={e => setCaption(e.target.value)}
-              placeholder="Write your caption..."
-              rows={5}
-              className="mb-2"
-            />
+            <div className="relative">
+              <Textarea
+                value={caption}
+                onChange={e => setCaption(e.target.value)}
+                placeholder="Write your caption..."
+                rows={5}
+                className="mb-2 pr-12"
+              />
+              
+              {/* AI Caption Generation Button */}
+              <button
+                onClick={handleGenerateCaption}
+                disabled={isGeneratingCaption || selectedImages.length === 0}
+                className="absolute top-2 right-2 h-8 w-8 rounded-md bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 hover:from-purple-600 hover:via-pink-600 hover:to-blue-600 disabled:from-gray-400 disabled:via-gray-500 disabled:to-gray-600 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 flex items-center justify-center group"
+                title={selectedImages.length === 0 ? "Select images first" : "Generate AI Caption"}
+              >
+                {isGeneratingCaption ? (
+                  <Loader2 className="h-4 w-4 text-white animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4 text-white group-hover:animate-pulse" />
+                )}
+                
+                {/* Shimmer effect */}
+                <div className="absolute inset-0 rounded-md bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 transform -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out"></div>
+              </button>
+            </div>
+            
             <div className="flex gap-2">
                 <Button
                   className="flex-1"
