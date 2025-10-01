@@ -52,6 +52,31 @@ router.get('/accounts', authenticateToken, async (req, res) => {
   }
 });
 
+// Get Facebook pages for a specific Facebook account
+router.get('/accounts/:accountId/pages', authenticateToken, async (req, res) => {
+  try {
+    const account = await SocialAccount.findOne({
+      _id: req.params.accountId,
+      userId: req.user.id,
+      platform: 'facebook',
+      isActive: true
+    });
+
+    if (!account) {
+      return res.status(404).json({ error: 'Facebook account not found' });
+    }
+
+    const pages = account.accountData?.pages || [];
+    res.json({ 
+      accountName: account.accountName,
+      pages: pages
+    });
+  } catch (error) {
+    console.error('Get Facebook pages error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Facebook OAuth initiation - Updated to use backend callback
 router.get('/auth/facebook', authenticateToken, async (req, res) => {
   try {
@@ -156,55 +181,40 @@ router.post('/auth/facebook/callback', authenticateToken, async (req, res) => {
 
     console.log('Facebook user info:', userResponse.data.name);
 
-    // Save Facebook personal account
-    const facebookAccount = await SocialAccount.create({
-      userId: req.user.id,
-      platform: 'facebook',
-      accountId: userResponse.data.id,
-      accountName: userResponse.data.name,
-      accessToken: access_token,
-      permissions: ['pages_manage_posts', 'pages_read_engagement'],
-      accountData: {
-        profilePicture: userResponse.data.picture?.data?.url,
-        followerCount: 0,
-        bio: '',
-        email: userResponse.data.email
-      },
-      isActive: true
-    });
+    // Initialize Facebook account data with pages array
+    let facebookAccountData = {
+      profilePicture: userResponse.data.picture?.data?.url,
+      followerCount: 0,
+      bio: '',
+      email: userResponse.data.email,
+      displayName: userResponse.data.name,
+      pages: []
+    };
 
-    console.log('Facebook account saved:', facebookAccount._id);
-
-    // Get user's Facebook pages
+    // Get user's Facebook pages first
     try {
       const pagesResponse = await axios.get(`https://graph.facebook.com/v18.0/me/accounts`, {
         params: {
           access_token: access_token,
-          fields: 'id,name,access_token,picture,fan_count,instagram_business_account'
+          fields: 'id,name,access_token,picture,fan_count,instagram_business_account,category'
         }
       });
 
       console.log('Facebook pages found:', pagesResponse.data.data.length);
 
-      // Save Facebook pages
+      // Store pages in the account data array instead of separate accounts
       for (const page of pagesResponse.data.data) {
-        const pageAccount = await SocialAccount.create({
-          userId: req.user.id,
-          platform: 'facebook',
-          accountId: page.id,
-          accountName: page.name,
+        const pageData = {
+          id: page.id,
+          name: page.name,
           accessToken: page.access_token,
-          permissions: ['pages_manage_posts', 'pages_read_engagement'],
-          accountData: {
-            profilePicture: page.picture?.data?.url,
-            followerCount: page.fan_count || 0,
-            bio: '',
-            pageType: 'page'
-          },
-          isActive: true
-        });
+          profilePicture: page.picture?.data?.url,
+          followerCount: page.fan_count || 0,
+          category: page.category || 'Page'
+        };
 
-        console.log('Facebook page saved:', page.name);
+        facebookAccountData.pages.push(pageData);
+        console.log('Facebook page added to account data:', page.name);
 
         // Handle Instagram business account if exists
         if (page.instagram_business_account) {
@@ -216,6 +226,7 @@ router.post('/auth/facebook/callback', authenticateToken, async (req, res) => {
               }
             });
 
+            // Create separate Instagram account (this is correct as Instagram is a different platform)
             await SocialAccount.create({
               userId: req.user.id,
               platform: 'instagram',
@@ -226,7 +237,9 @@ router.post('/auth/facebook/callback', authenticateToken, async (req, res) => {
               accountData: {
                 profilePicture: instagramData.data.profile_picture_url,
                 followerCount: instagramData.data.followers_count || 0,
-                bio: instagramData.data.biography || ''
+                bio: instagramData.data.biography || '',
+                displayName: instagramData.data.username,
+                connectedViaFacebookPage: page.name
               },
               isActive: true
             });
@@ -237,8 +250,37 @@ router.post('/auth/facebook/callback', authenticateToken, async (req, res) => {
           }
         }
       }
+
+      // Now create a SINGLE Facebook account with all pages as account data
+      const facebookAccount = await SocialAccount.create({
+        userId: req.user.id,
+        platform: 'facebook',
+        accountId: userResponse.data.id,
+        accountName: userResponse.data.name, // Main Facebook account name
+        accessToken: access_token,
+        permissions: ['pages_manage_posts', 'pages_read_engagement'],
+        accountData: facebookAccountData,
+        isActive: true
+      });
+
+      console.log('Single Facebook account saved with', facebookAccountData.pages.length, 'pages:', userResponse.data.name);
+
     } catch (pagesError) {
       console.error('Error fetching Facebook pages:', pagesError.response?.data || pagesError.message);
+      
+      // Even if pages fail, create the main Facebook account
+      const facebookAccount = await SocialAccount.create({
+        userId: req.user.id,
+        platform: 'facebook',
+        accountId: userResponse.data.id,
+        accountName: userResponse.data.name,
+        accessToken: access_token,
+        permissions: ['pages_manage_posts', 'pages_read_engagement'],
+        accountData: facebookAccountData,
+        isActive: true
+      });
+      
+      console.log('Facebook account saved without pages:', userResponse.data.name);
     }
 
     // Return all connected accounts for immediate UI update
@@ -845,6 +887,66 @@ router.delete('/accounts/cleanup', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('Cleanup accounts error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Fix Facebook accounts structure (utility route)
+router.post('/accounts/fix-facebook', authenticateToken, async (req, res) => {
+  try {
+    // Get all Facebook accounts for this user
+    const facebookAccounts = await SocialAccount.find({
+      userId: req.user.id,
+      platform: 'facebook',
+      isActive: true
+    });
+
+    if (facebookAccounts.length <= 1) {
+      return res.json({ 
+        success: true,
+        message: 'Facebook accounts structure is already correct',
+        accountCount: facebookAccounts.length
+      });
+    }
+
+    // Find the main account (without pageType) and page accounts
+    const mainAccount = facebookAccounts.find(acc => !acc.accountData?.pageType);
+    const pageAccounts = facebookAccounts.filter(acc => acc.accountData?.pageType === 'page');
+
+    if (!mainAccount) {
+      return res.status(400).json({ error: 'No main Facebook account found' });
+    }
+
+    // Update main account with pages data
+    const pagesData = pageAccounts.map(pageAcc => ({
+      id: pageAcc.accountId,
+      name: pageAcc.accountName,
+      accessToken: pageAcc.accessToken,
+      profilePicture: pageAcc.accountData?.profilePicture,
+      followerCount: pageAcc.accountData?.followerCount || 0,
+      category: 'Page'
+    }));
+
+    await SocialAccount.findByIdAndUpdate(mainAccount._id, {
+      'accountData.pages': pagesData
+    });
+
+    // Delete the separate page accounts
+    await SocialAccount.deleteMany({
+      _id: { $in: pageAccounts.map(acc => acc._id) }
+    });
+
+    console.log(`Fixed Facebook structure for user ${req.user.id}: moved ${pageAccounts.length} pages to main account`);
+    
+    res.json({ 
+      success: true,
+      message: 'Facebook accounts structure fixed',
+      mainAccount: mainAccount.accountName,
+      pagesMovedToMain: pageAccounts.length,
+      deletedPageAccounts: pageAccounts.length
+    });
+  } catch (error) {
+    console.error('Fix Facebook accounts error:', error);
     res.status(500).json({ error: error.message });
   }
 });

@@ -14,10 +14,30 @@ import { CheckCircle, Plus, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 
 const platforms = [
-  { id: "facebook", name: "Facebook", color: "#4267B2" },
-  { id: "instagram", name: "Instagram", color: "#E1306C" },
-  { id: "twitter", name: "Twitter", color: "#1DA1F2" },
-  { id: "tiktok", name: "TikTok", color: "#000000" },
+  { 
+    id: "facebook", 
+    name: "Facebook", 
+    logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/2023_Facebook_icon.svg/2048px-2023_Facebook_icon.svg.png",
+    color: "#1877F2"
+  },
+  { 
+    id: "instagram", 
+    name: "Instagram", 
+    logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/Instagram_logo_2016.svg/2048px-Instagram_logo_2016.svg.png",
+    color: "#E4405F"
+  },
+  { 
+    id: "twitter", 
+    name: "X (Twitter)", 
+    logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/X_logo_2023.svg/2048px-X_logo_2023.svg.png",
+    color: "#000000"
+  },
+  { 
+    id: "linkedin", 
+    name: "LinkedIn", 
+    logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/81/LinkedIn_icon.svg/2048px-LinkedIn_icon.svg.png",
+    color: "#0A66C2"
+  },
 ];
 
 const UploadMedia = () => {
@@ -32,6 +52,7 @@ const UploadMedia = () => {
   const [scheduledDate, setScheduledDate] = useState(new Date());
   const [scheduledTime, setScheduledTime] = useState("10:00");
   const [isGeneratingCaption, setIsGeneratingCaption] = useState(false);
+  const [connectedAccounts, setConnectedAccounts] = useState<any[]>([]);
 
   // Fetch imported media from Cloudinary on mount
   useEffect(() => {
@@ -47,12 +68,97 @@ const UploadMedia = () => {
         setGeneratedMedia(response.data.ads || []);
       } catch (err) {}
     };
+    const fetchConnectedAccounts = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+
+        const response = await fetch('/api/social-media/accounts', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setConnectedAccounts(Array.isArray(data) ? data : []);
+        }
+      } catch (err) {
+        console.error('Error fetching connected accounts:', err);
+      }
+    };
+    
     fetchMedia();
     fetchGenerated();
+    fetchConnectedAccounts();
   }, []);
+
+  // Get connected accounts for a platform
+  const getConnectedAccountsForPlatform = (platformId: string) => {
+    const platformMapping: { [key: string]: string } = {
+      'facebook': 'facebook',
+      'instagram': 'instagram', 
+      'twitter': 'x',
+      'linkedin': 'linkedin'
+    };
+    
+    const mappedPlatform = platformMapping[platformId];
+    
+    if (platformId === 'facebook') {
+      // For Facebook, group all Facebook accounts (including pages) as one platform
+      const fbAccounts = connectedAccounts.filter(acc => acc.platform === 'facebook' && acc.isActive);
+      return fbAccounts;
+    }
+    
+    return connectedAccounts.filter(acc => acc.platform === mappedPlatform && acc.isActive);
+  };
+
+  // Get display text for connected accounts
+  const getAccountDisplayText = (platformId: string, accounts: any[]) => {
+    if (accounts.length === 0) return null;
+    
+    if (platformId === 'facebook') {
+      // With the new structure, there should only be one Facebook account
+      if (accounts.length === 1) {
+        const account = accounts[0];
+        const pages = account.accountData?.pages || [];
+        
+        if (pages.length === 0) {
+          // No pages, show main account name
+          return account.accountName;
+        } else if (pages.length === 1) {
+          // One page, show the page name
+          return pages[0].name;
+        } else {
+          // Multiple pages, show first page + count
+          return `${pages[0].name} +${pages.length - 1} more`;
+        }
+      } else {
+        // This shouldn't happen with new structure, but fallback
+        return `${accounts.length} accounts`;
+      }
+    }
+    
+    return accounts.length === 1 
+      ? accounts[0].accountName 
+      : `${accounts.length} accounts`;
+  };
 
   // Platform selection
   const togglePlatformSelection = (platform: string) => {
+    const platformAccounts = getConnectedAccountsForPlatform(platform);
+    
+    // Only allow selection if there are connected accounts
+    if (platformAccounts.length === 0) {
+      toast({ 
+        title: "Account not connected", 
+        description: `Please connect your ${platform} account first`,
+        variant: "destructive" 
+      });
+      return;
+    }
+    
     setSelectedPlatforms(selectedPlatforms.includes(platform)
       ? selectedPlatforms.filter(p => p !== platform)
       : [...selectedPlatforms, platform]
@@ -274,35 +380,96 @@ const UploadMedia = () => {
         <Card className="flex-1">
           <CardHeader>
             <CardTitle>Select Platforms</CardTitle>
-            <CardDescription>Choose where to publish your content</CardDescription>
+            <CardDescription>
+              Choose where to publish your content. Only connected accounts can be selected.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            {platforms.map((platform) => (
-              <div key={platform.id}>
-                <button
-                  className={`flex items-center gap-3 w-full p-3 rounded-md transition-colors ${
-                    selectedPlatforms.includes(platform.id) 
-                      ? "bg-primary/10" 
-                      : "hover:bg-muted"
-                  }`}
-                  onClick={() => togglePlatformSelection(platform.id)}
-                >
-                  <div 
-                    className="h-8 w-8 rounded-full flex items-center justify-center"
-                    style={{ backgroundColor: `${platform.color}20` }}
+            {platforms.map((platform) => {
+              const platformAccounts = getConnectedAccountsForPlatform(platform.id);
+              const isConnected = platformAccounts.length > 0;
+              const isSelected = selectedPlatforms.includes(platform.id);
+              
+              return (
+                <div key={platform.id}>
+                  <button
+                    className={`flex items-center gap-3 w-full p-3 rounded-md transition-colors ${
+                      isSelected 
+                        ? "bg-primary/10 border border-primary/20" 
+                        : isConnected 
+                          ? "hover:bg-muted" 
+                          : "hover:bg-muted/50 opacity-75 cursor-not-allowed"
+                    }`}
+                    onClick={() => togglePlatformSelection(platform.id)}
+                    disabled={!isConnected}
                   >
-                    <span style={{ color: platform.color }} className="text-lg font-bold">
-                      {platform.name[0]}
-                    </span>
-                  </div>
-                  <span className="font-medium">{platform.name}</span>
-                  {selectedPlatforms.includes(platform.id) && (
-                    <CheckCircle className="ml-auto h-4 w-4 text-primary" />
-                  )}
-                </button>
-                {platform.id !== platforms[platforms.length - 1].id && <Separator className="my-2" />}
+                    <div className="h-8 w-8 rounded-full overflow-hidden flex items-center justify-center border border-gray-300/30 shadow-sm">
+                      <img 
+                        src={platform.logo} 
+                        alt={`${platform.name} logo`}
+                        className="h-full w-full object-cover"
+                        style={{
+                          filter: platform.id === 'twitter' ? 'invert(1)' : 'none'
+                        }}
+                        onError={(e) => {
+                          // Fallback to colored letter if image fails to load
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                          const parent = target.parentElement;
+                          if (parent) {
+                            parent.innerHTML = `<span class="text-sm font-bold" style="color: ${platform.color}">${platform.name[0]}</span>`;
+                            parent.style.backgroundColor = `${platform.color}15`;
+                            parent.style.borderColor = `${platform.color}40`;
+                          }
+                        }}
+                      />
+                    </div>
+                    
+                    <div className="flex-1 text-left">
+                      <div className="font-medium">{platform.name}</div>
+                      
+                      {isConnected ? (
+                        <div className="text-xs text-muted-foreground">
+                          <span className="text-green-400 font-medium">
+                            ✓ {getAccountDisplayText(platform.id, platformAccounts)}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="text-xs text-red-400 font-medium">
+                          ✗ Not connected
+                        </div>
+                      )}
+                    </div>
+
+                    {isSelected && (
+                      <CheckCircle className="h-4 w-4 text-primary" />
+                    )}
+                    
+                    {!isConnected && (
+                      <div className="h-4 w-4 rounded-full bg-red-500/20 flex items-center justify-center">
+                        <div className="h-2 w-2 rounded-full bg-red-500"></div>
+                      </div>
+                    )}
+                  </button>
+                  {platform.id !== platforms[platforms.length - 1].id && <Separator className="my-2" />}
+                </div>
+              );
+            })}
+            
+            {connectedAccounts.length === 0 && (
+              <div className="mt-4 p-3 bg-muted/50 rounded-md text-center">
+                <p className="text-sm text-muted-foreground mb-2">
+                  No social media accounts connected yet.
+                </p>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => window.location.href = '/dashboard/link-accounts'}
+                >
+                  Connect Accounts
+                </Button>
               </div>
-            ))}
+            )}
           </CardContent>
         </Card>
       </div>
