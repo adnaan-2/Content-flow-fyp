@@ -1,14 +1,33 @@
 import React, { useState, useEffect } from 'react';
 
+interface FacebookPage {
+  id: string;
+  name: string;
+  accessToken: string;
+  profilePicture?: string;
+  followerCount?: number;
+  category?: string;
+  permissions?: string[];
+  isActive?: boolean;
+}
+
 interface SocialAccount {
   _id: string;
   platform: string;
   accountName: string;
-  accountData: {
-    profilePicture?: string;
+  email?: string;
+  profilePicture?: string;
+  accessToken: string;
+  permissions: string[];
+  platformData: {
+    pages?: FacebookPage[];
     followerCount?: number;
     bio?: string;
-    pageType?: string;
+    displayName?: string;
+    instagramBusinessId?: string;
+    connectedFacebookPageId?: string;
+    username?: string;
+    verified?: boolean;
   };
   isActive: boolean;
 }
@@ -137,6 +156,20 @@ export default function LinkAccounts() {
 
       if (response.ok) {
         const data = await response.json();
+        console.log('🔍 Fetched accounts:', data);
+        
+        // Log Facebook accounts specifically
+        const facebookAccounts = data.filter(acc => acc.platform === 'facebook');
+        console.log('📱 Facebook accounts:', facebookAccounts);
+        facebookAccounts.forEach(acc => {
+          console.log(`   - ${acc.accountName}: ${acc.platformData?.pages?.length || 0} pages`);
+          if (acc.platformData?.pages) {
+            acc.platformData.pages.forEach(page => {
+              console.log(`     * ${page.name} (${page.id})`);
+            });
+          }
+        });
+        
         if (Array.isArray(data)) {
           setConnectedAccounts(data);
         }
@@ -452,79 +485,126 @@ export default function LinkAccounts() {
                 {/* Connected Account Info */}
                 {isConnected && platformConnectedAccounts.length > 0 && (
                   <div className="mb-6">
-                    {/* Sort accounts: personal first, then pages */}
-                    {platformConnectedAccounts
-                      .sort((a, b) => {
-                        // Accounts without pageType first (personal accounts)
-                        if (!a.accountData.pageType && b.accountData.pageType) return -1;
-                        if (a.accountData.pageType && !b.accountData.pageType) return 1;
-                        return 0;
-                      })
-                      .map((account, index) => {
-                        const isPage = account.accountData.pageType === 'page';
-                        const previousAccount = index > 0 ? platformConnectedAccounts[index - 1] : null;
-                        const showAsChild = isPage && previousAccount && !previousAccount.accountData.pageType;
+                    {/* Handle Facebook specially to show pages */}
+                    {platform.platform === 'facebook' ? (
+                      <div>
+                        {platformConnectedAccounts.map((account) => (
+                          <div key={account._id} className="mb-4">
+                            {/* Main Facebook Account */}
+                            <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/50">
+                              <div className="flex items-center space-x-3">
+                                {account.profilePicture && (
+                                  <img 
+                                    src={account.profilePicture} 
+                                    alt="Profile" 
+                                    className="w-12 h-12 rounded-full object-cover border-2 border-gray-600"
+                                  />
+                                )}
+                                <div className="flex-1">
+                                  <h4 className="font-medium text-white">
+                                    {account.accountName}
+                                  </h4>
+                                  <p className="text-gray-400 text-sm">
+                                    Facebook Account
+                                  </p>
+                                  {account.email && (
+                                    <p className="text-gray-500 text-xs mt-1">
+                                      {account.email}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-blue-400 text-sm font-medium">
+                                    {account.platformData?.pages?.length || 0} Pages
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
 
-                        if (showAsChild) {
-                          // Show as child page
-                          return (
-                            <div key={account._id} className="ml-8 mt-2">
-                              <div className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/30 relative">
-                                {/* Connection line */}
-                                <div className="absolute -left-8 top-1/2 w-6 h-px bg-gray-600"></div>
-                                <div className="absolute -left-8 top-1/2 w-2 h-2 bg-gray-600 rounded-full transform -translate-y-1/2"></div>
-                                
-                                <div className="flex items-center space-x-3">
-                                  {account.accountData.profilePicture && (
-                                    <img 
-                                      src={account.accountData.profilePicture} 
-                                      alt="Page" 
-                                      className="w-8 h-8 rounded-full object-cover border border-gray-600"
-                                    />
-                                  )}
-                                  <div className="flex-1">
-                                    <h5 className="font-medium text-white text-sm">
-                                      {account.accountName}
-                                    </h5>
-                                    {account.accountData.followerCount !== undefined && (
-                                      <p className="text-gray-400 text-xs mt-1">
-                                        {account.accountData.followerCount.toLocaleString()} followers
-                                      </p>
-                                    )}
+                            {/* Facebook Pages */}
+                            {account.platformData?.pages && account.platformData.pages.length > 0 && (
+                              <div className="ml-6 mt-3 space-y-2">
+                                {account.platformData.pages.map((page) => (
+                                  <div key={page.id} className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/30 relative">
+                                    {/* Connection line */}
+                                    <div className="absolute -left-6 top-1/2 w-4 h-px bg-gray-600"></div>
+                                    <div className="absolute -left-6 top-1/2 w-2 h-2 bg-blue-500 rounded-full transform -translate-y-1/2"></div>
+                                    
+                                    <div className="flex items-center space-x-3">
+                                      {page.profilePicture && (
+                                        <img 
+                                          src={page.profilePicture} 
+                                          alt="Page" 
+                                          className="w-10 h-10 rounded-full object-cover border border-gray-600"
+                                        />
+                                      )}
+                                      <div className="flex-1">
+                                        <h5 className="font-medium text-white text-sm">
+                                          {page.name}
+                                        </h5>
+                                        <div className="flex items-center space-x-4 mt-1">
+                                          {page.category && (
+                                            <span className="text-gray-400 text-xs">
+                                              {page.category}
+                                            </span>
+                                          )}
+                                          {page.followerCount !== undefined && (
+                                            <span className="text-gray-400 text-xs">
+                                              {page.followerCount.toLocaleString()} followers
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center space-x-2">
+                                        {/* Page status indicator */}
+                                        <div className={`w-2 h-2 rounded-full ${
+                                          page.isActive !== false ? 'bg-green-500' : 'bg-gray-500'
+                                        }`}></div>
+                                        {/* Token status */}
+                                        <div className={`px-2 py-1 rounded text-xs ${
+                                          page.accessToken ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'
+                                        }`}>
+                                          {page.accessToken ? 'Ready' : 'No Token'}
+                                        </div>
+                                      </div>
+                                    </div>
                                   </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      /* Other platforms (Instagram, LinkedIn, X) */
+                      <div>
+                        {platformConnectedAccounts.map((account) => (
+                          <div key={account._id} className="mb-3">
+                            <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/50">
+                              <div className="flex items-center space-x-3">
+                                {account.profilePicture && (
+                                  <img 
+                                    src={account.profilePicture} 
+                                    alt="Profile" 
+                                    className="w-12 h-12 rounded-full object-cover border-2 border-gray-600"
+                                  />
+                                )}
+                                <div className="flex-1">
+                                  <h4 className="font-medium text-white">
+                                    {account.accountName}
+                                  </h4>
+                                  {account.platformData?.followerCount !== undefined && (
+                                    <p className="text-gray-400 text-sm mt-1">
+                                      {account.platformData.followerCount.toLocaleString()} followers
+                                    </p>
+                                  )}
                                 </div>
                               </div>
                             </div>
-                          );
-                        } else {
-                          // Show as main account
-                          return (
-                            <div key={account._id} className="mb-3">
-                              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/50">
-                                <div className="flex items-center space-x-3">
-                                  {account.accountData.profilePicture && (
-                                    <img 
-                                      src={account.accountData.profilePicture} 
-                                      alt="Profile" 
-                                      className="w-12 h-12 rounded-full object-cover border-2 border-gray-600"
-                                    />
-                                  )}
-                                  <div className="flex-1">
-                                    <h4 className="font-medium text-white">
-                                      {account.accountName}
-                                    </h4>
-                                    {account.accountData.followerCount !== undefined && (
-                                      <p className="text-gray-400 text-sm mt-1">
-                                        {account.accountData.followerCount.toLocaleString()} followers
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        }
-                      })}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 

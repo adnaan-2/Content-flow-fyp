@@ -122,7 +122,7 @@ const UploadMedia = () => {
       // With the new structure, there should only be one Facebook account
       if (accounts.length === 1) {
         const account = accounts[0];
-        const pages = account.accountData?.pages || [];
+        const pages = account.platformData?.pages || [];
         
         if (pages.length === 0) {
           // No pages, show main account name
@@ -451,6 +451,33 @@ const UploadMedia = () => {
                       </div>
                     )}
                   </button>
+
+                  {/* Show Facebook Pages as sub-options when selected */}
+                  {platform.id === 'facebook' && isSelected && isConnected && (
+                    <div className="ml-8 mt-2 space-y-1">
+                      {platformAccounts.map((account) => {
+                        const pages = account.platformData?.pages || [];
+                        return pages.map((page: any) => (
+                          <div key={page.id} className="flex items-center gap-2 p-2 bg-muted/30 rounded-md text-sm">
+                            {page.profilePicture && (
+                              <img 
+                                src={page.profilePicture} 
+                                alt="Page" 
+                                className="w-6 h-6 rounded-full object-cover"
+                              />
+                            )}
+                            <span className="text-muted-foreground">📄 {page.name}</span>
+                            {page.followerCount !== undefined && (
+                              <span className="text-xs text-muted-foreground ml-auto">
+                                {page.followerCount.toLocaleString()} followers
+                              </span>
+                            )}
+                          </div>
+                        ));
+                      })}
+                    </div>
+                  )}
+                  
                   {platform.id !== platforms[platforms.length - 1].id && <Separator className="my-2" />}
                 </div>
               );

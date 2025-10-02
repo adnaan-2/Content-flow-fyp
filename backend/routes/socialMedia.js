@@ -45,6 +45,14 @@ router.get('/accounts', authenticateToken, async (req, res) => {
       userId: req.user.id,
       isActive: true 
     });
+    
+    console.log(`Found ${accounts.length} accounts for user ${req.user.id}`);
+    accounts.forEach(acc => {
+      if (acc.platform === 'facebook') {
+        console.log(`Facebook: ${acc.accountName} - Pages: ${acc.platformData?.pages?.length || 0}`);
+      }
+    });
+    
     res.json(accounts);
   } catch (error) {
     console.error('Get accounts error:', error);
@@ -66,7 +74,7 @@ router.get('/accounts/:accountId/pages', authenticateToken, async (req, res) => 
       return res.status(404).json({ error: 'Facebook account not found' });
     }
 
-    const pages = account.accountData?.pages || [];
+    const pages = account.platformData?.pages || [];
     res.json({ 
       accountName: account.accountName,
       pages: pages
@@ -138,7 +146,7 @@ router.get('/callback/facebook', async (req, res) => {
   }
 });
 
-// Update the Facebook OAuth callback to use backend redirect URI
+// Facebook OAuth callback - Clean and simple
 router.post('/auth/facebook/callback', authenticateToken, async (req, res) => {
   try {
     const { code } = req.body;
@@ -147,31 +155,24 @@ router.post('/auth/facebook/callback', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Authorization code is required' });
     }
 
-    console.log('Facebook OAuth - Exchange code for token');
+    console.log('🔗 Facebook OAuth - Starting authentication');
     
-    // Clear any existing Facebook accounts first
-    await SocialAccount.deleteMany({
-      userId: req.user.id,
-      platform: 'facebook'
-    });
-
-    // Use the backend redirect URI that was used in the OAuth initiation
     const backendRedirectUri = process.env.BASE_URL + '/api/social-media/callback/facebook';
 
-    // Exchange code for access token
+    // Step 1: Exchange code for access token
     const tokenResponse = await axios.get(`https://graph.facebook.com/v18.0/oauth/access_token`, {
       params: {
         client_id: FACEBOOK_APP_ID,
         client_secret: FACEBOOK_APP_SECRET,
-        redirect_uri: backendRedirectUri, // This MUST match the OAuth initiation
+        redirect_uri: backendRedirectUri,
         code: code
       }
     });
 
     const { access_token } = tokenResponse.data;
-    console.log('Facebook access token received');
+    console.log('✅ Facebook access token received');
 
-    // Get user info
+    // Step 2: Get Facebook user info
     const userResponse = await axios.get(`https://graph.facebook.com/v18.0/me`, {
       params: {
         access_token: access_token,
@@ -179,19 +180,11 @@ router.post('/auth/facebook/callback', authenticateToken, async (req, res) => {
       }
     });
 
-    console.log('Facebook user info:', userResponse.data.name);
+    const facebookUser = userResponse.data;
+    console.log('👤 Facebook user:', facebookUser.name);
 
-    // Initialize Facebook account data with pages array
-    let facebookAccountData = {
-      profilePicture: userResponse.data.picture?.data?.url,
-      followerCount: 0,
-      bio: '',
-      email: userResponse.data.email,
-      displayName: userResponse.data.name,
-      pages: []
-    };
-
-    // Get user's Facebook pages first
+    // Step 3: Get Facebook pages
+    let pages = [];
     try {
       const pagesResponse = await axios.get(`https://graph.facebook.com/v18.0/me/accounts`, {
         params: {
@@ -200,110 +193,129 @@ router.post('/auth/facebook/callback', authenticateToken, async (req, res) => {
         }
       });
 
-      console.log('Facebook pages found:', pagesResponse.data.data.length);
-
-      // Store pages in the account data array instead of separate accounts
-      for (const page of pagesResponse.data.data) {
-        const pageData = {
-          id: page.id,
-          name: page.name,
-          accessToken: page.access_token,
-          profilePicture: page.picture?.data?.url,
-          followerCount: page.fan_count || 0,
-          category: page.category || 'Page'
-        };
-
-        facebookAccountData.pages.push(pageData);
-        console.log('Facebook page added to account data:', page.name);
-
-        // Handle Instagram business account if exists
-        if (page.instagram_business_account) {
-          try {
-            const instagramData = await axios.get(`https://graph.facebook.com/v18.0/${page.instagram_business_account.id}`, {
-              params: {
-                access_token: page.access_token,
-                fields: 'id,username,profile_picture_url,followers_count,biography'
-              }
-            });
-
-            // Create separate Instagram account (this is correct as Instagram is a different platform)
-            await SocialAccount.create({
-              userId: req.user.id,
-              platform: 'instagram',
-              accountId: instagramData.data.id,
-              accountName: instagramData.data.username,
-              accessToken: page.access_token,
-              permissions: ['instagram_basic', 'instagram_content_publish'],
-              accountData: {
-                profilePicture: instagramData.data.profile_picture_url,
-                followerCount: instagramData.data.followers_count || 0,
-                bio: instagramData.data.biography || '',
-                displayName: instagramData.data.username,
-                connectedViaFacebookPage: page.name
-              },
-              isActive: true
-            });
-
-            console.log('Instagram account saved:', instagramData.data.username);
-          } catch (instagramError) {
-            console.error('Error saving Instagram account:', instagramError.response?.data || instagramError.message);
-          }
-        }
-      }
-
-      // Now create a SINGLE Facebook account with all pages as account data
-      const facebookAccount = await SocialAccount.create({
-        userId: req.user.id,
-        platform: 'facebook',
-        accountId: userResponse.data.id,
-        accountName: userResponse.data.name, // Main Facebook account name
-        accessToken: access_token,
+      pages = pagesResponse.data.data.map(page => ({
+        id: page.id,
+        name: page.name,
+        accessToken: page.access_token,
+        profilePicture: page.picture?.data?.url,
+        followerCount: page.fan_count || 0,
+        category: page.category || 'Page',
         permissions: ['pages_manage_posts', 'pages_read_engagement'],
-        accountData: facebookAccountData,
         isActive: true
-      });
+      }));
 
-      console.log('Single Facebook account saved with', facebookAccountData.pages.length, 'pages:', userResponse.data.name);
-
+      console.log(`📄 Found ${pages.length} Facebook pages`);
     } catch (pagesError) {
-      console.error('Error fetching Facebook pages:', pagesError.response?.data || pagesError.message);
-      
-      // Even if pages fail, create the main Facebook account
-      const facebookAccount = await SocialAccount.create({
-        userId: req.user.id,
-        platform: 'facebook',
-        accountId: userResponse.data.id,
-        accountName: userResponse.data.name,
-        accessToken: access_token,
-        permissions: ['pages_manage_posts', 'pages_read_engagement'],
-        accountData: facebookAccountData,
-        isActive: true
-      });
-      
-      console.log('Facebook account saved without pages:', userResponse.data.name);
+      console.error('⚠️  Error fetching Facebook pages:', pagesError.message);
     }
 
-    // Return all connected accounts for immediate UI update
-    const allAccounts = await SocialAccount.find({ 
+    // Step 4: Create or update Facebook account
+    const existingAccount = await SocialAccount.findByPlatformAccountId(
+      req.user.id, 
+      'facebook', 
+      facebookUser.id
+    );
+
+    let facebookAccount;
+    const accountData = {
       userId: req.user.id,
-      isActive: true 
-    });
+      platform: 'facebook',
+      accountId: facebookUser.id,
+      accountName: facebookUser.name,
+      email: facebookUser.email,
+      profilePicture: facebookUser.picture?.data?.url,
+      accessToken: access_token,
+      permissions: ['pages_manage_posts', 'pages_read_engagement', 'pages_show_list'],
+      platformData: {
+        pages: pages,
+        followerCount: 0,
+        displayName: facebookUser.name
+      },
+      isActive: true
+    };
+
+    if (existingAccount) {
+      facebookAccount = await SocialAccount.findByIdAndUpdate(
+        existingAccount._id,
+        accountData,
+        { new: true }
+      );
+      console.log('🔄 Updated existing Facebook account');
+    } else {
+      facebookAccount = await SocialAccount.create(accountData);
+      console.log('✨ Created new Facebook account');
+    }
+
+    // Step 5: Handle Instagram business accounts
+    for (const page of pages) {
+      if (page.instagram_business_account) {
+        try {
+          const instagramResponse = await axios.get(
+            `https://graph.facebook.com/v18.0/${page.instagram_business_account.id}`,
+            {
+              params: {
+                access_token: page.accessToken,
+                fields: 'id,username,profile_picture_url,followers_count,biography'
+              }
+            }
+          );
+
+          const instagramData = instagramResponse.data;
+          
+          // Check if Instagram account already exists
+          const existingInstagram = await SocialAccount.findByPlatformAccountId(
+            req.user.id,
+            'instagram',
+            instagramData.id
+          );
+
+          const instagramAccountData = {
+            userId: req.user.id,
+            platform: 'instagram',
+            accountId: instagramData.id,
+            accountName: instagramData.username,
+            profilePicture: instagramData.profile_picture_url,
+            accessToken: page.accessToken, // Use page token for Instagram API
+            permissions: ['instagram_basic', 'instagram_content_publish'],
+            platformData: {
+              followerCount: instagramData.followers_count || 0,
+              bio: instagramData.biography || '',
+              displayName: instagramData.username,
+              connectedFacebookPageId: page.id,
+              instagramBusinessId: instagramData.id
+            },
+            isActive: true
+          };
+
+          if (existingInstagram) {
+            await SocialAccount.findByIdAndUpdate(existingInstagram._id, instagramAccountData);
+            console.log('🔄 Updated Instagram account:', instagramData.username);
+          } else {
+            await SocialAccount.create(instagramAccountData);
+            console.log('✨ Created Instagram account:', instagramData.username);
+          }
+
+        } catch (instagramError) {
+          console.error('⚠️  Error processing Instagram account:', instagramError.message);
+        }
+      }
+    }
+
+    // Step 6: Return all user's accounts
+    const allAccounts = await SocialAccount.findUserAccounts(req.user.id);
 
     res.json({ 
       success: true, 
-      message: 'Facebook accounts connected successfully',
+      message: `Facebook connected with ${pages.length} pages`,
       accounts: allAccounts
     });
 
   } catch (error) {
-    console.error('Facebook auth error:', error.response?.data || error.message);
+    console.error('❌ Facebook auth error:', error.response?.data || error.message);
     
-    // Provide specific error messages
     let errorMessage = 'Facebook authentication failed';
     if (error.response?.data?.error?.message) {
       errorMessage = error.response.data.error.message;
-    } else if (error.response?.status === 400) {
-      errorMessage = 'Invalid authorization code or redirect URI mismatch';
     }
 
     res.status(500).json({ 
@@ -353,11 +365,7 @@ router.post('/auth/linkedin/callback', authenticateToken, async (req, res) => {
 
     console.log('LinkedIn OAuth - Starting token exchange');
 
-    // Clear any existing LinkedIn accounts first (enforce one account per platform)
-    await SocialAccount.deleteMany({
-      userId: req.user.id,
-      platform: 'linkedin'
-    });
+    console.log('🔗 LinkedIn OAuth - Starting authentication');
 
     // Exchange code for access token
     const tokenData = {
@@ -389,22 +397,39 @@ router.post('/auth/linkedin/callback', authenticateToken, async (req, res) => {
     const profile = profileResponse.data;
     console.log('LinkedIn profile retrieved:', profile.name);
 
-    // Save LinkedIn account to database
-    const savedAccount = await SocialAccount.create({
+    // Create or update LinkedIn account
+    const existingAccount = await SocialAccount.findByPlatformAccountId(
+      req.user.id,
+      'linkedin',
+      profile.sub
+    );
+
+    const accountData = {
       userId: req.user.id,
       platform: 'linkedin',
       accountId: profile.sub,
       accountName: profile.name,
+      email: profile.email,
+      profilePicture: profile.picture,
       accessToken: access_token,
       permissions: ['openid', 'profile', 'email', 'w_member_social'],
-      accountData: {
-        profilePicture: profile.picture,
+      platformData: {
         followerCount: 0,
-        bio: profile.name, // Use name as bio since we don't have bio access
-        email: profile.email
+        bio: profile.name,
+        displayName: profile.name,
+        linkedinId: profile.sub
       },
       isActive: true
-    });
+    };
+
+    let savedAccount;
+    if (existingAccount) {
+      savedAccount = await SocialAccount.findByIdAndUpdate(existingAccount._id, accountData, { new: true });
+      console.log('🔄 Updated existing LinkedIn account');
+    } else {
+      savedAccount = await SocialAccount.create(accountData);
+      console.log('✨ Created new LinkedIn account');
+    }
 
     console.log('LinkedIn account saved to database:', savedAccount._id);
 
@@ -415,7 +440,7 @@ router.post('/auth/linkedin/callback', authenticateToken, async (req, res) => {
         _id: savedAccount._id,
         platform: savedAccount.platform,
         accountName: savedAccount.accountName,
-        accountData: savedAccount.accountData,
+        platformData: savedAccount.platformData,
         isActive: savedAccount.isActive
       }
     });
@@ -589,11 +614,7 @@ router.post('/auth/x/callback', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Token secret not found. Please restart the OAuth flow.' });
     }
 
-    // Clear any existing X accounts first
-    await SocialAccount.deleteMany({
-      userId: req.user.id,
-      platform: 'x'
-    });
+    // We'll check if X account exists after getting user data
 
     const crypto = require('crypto');
 
@@ -795,7 +816,7 @@ router.post('/auth/x/callback', authenticateToken, async (req, res) => {
         _id: xAccount._id,
         platform: xAccount.platform,
         accountName: xAccount.accountName,
-        accountData: xAccount.accountData,
+        platformData: xAccount.platformData,
         isActive: xAccount.isActive
       }
     });
@@ -831,22 +852,48 @@ router.post('/auth/x/callback', authenticateToken, async (req, res) => {
   }
 });
 
-// Disconnect account
+// Disconnect specific account
 router.delete('/accounts/:accountId', authenticateToken, async (req, res) => {
   try {
-    const deletedAccount = await SocialAccount.findOneAndDelete({
+    const account = await SocialAccount.findOne({
       _id: req.params.accountId,
       userId: req.user.id 
     });
 
-    if (!deletedAccount) {
+    if (!account) {
       return res.status(404).json({ error: 'Account not found' });
     }
 
-    console.log(`Account ${deletedAccount.platform} - ${deletedAccount.accountName} deleted for user ${req.user.id}`);
-    res.json({ success: true, message: 'Account disconnected and removed successfully' });
+    // If disconnecting Facebook, also remove connected Instagram accounts
+    if (account.platform === 'facebook') {
+      const connectedInstagram = await SocialAccount.find({
+        userId: req.user.id,
+        platform: 'instagram',
+        'platformData.connectedFacebookPageId': { $in: account.platformData?.pages?.map(p => p.id) || [] }
+      });
+
+      if (connectedInstagram.length > 0) {
+        await SocialAccount.deleteMany({
+          _id: { $in: connectedInstagram.map(acc => acc._id) }
+        });
+        console.log(`🗑️  Also deleted ${connectedInstagram.length} connected Instagram accounts`);
+      }
+    }
+
+    // Delete the main account
+    await SocialAccount.findByIdAndDelete(account._id);
+
+    console.log(`🗑️  Deleted ${account.platform} account: ${account.accountName}`);
+    res.json({ 
+      success: true, 
+      message: `${account.platform} account disconnected successfully`,
+      deletedAccount: {
+        platform: account.platform,
+        accountName: account.accountName
+      }
+    });
   } catch (error) {
-    console.error('Disconnect account error:', error);
+    console.error('❌ Disconnect account error:', error);
     res.status(500).json({ error: error.message });
   }
 });
