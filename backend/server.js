@@ -14,6 +14,10 @@ dotenv.config();
 // Connect to database
 connectDB();
 
+// Initialize post scheduler
+const { initializeScheduler } = require('./controllers/postController');
+initializeScheduler();
+
 // Create uploads directory if it doesn't exist
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
@@ -77,10 +81,6 @@ app.use('/api/profile', require('./routes/profileRoutes'));
 const mediaRoutes = require('./routes/mediaRoutes');
 app.use('/api/media', mediaRoutes);
 
-// Add this to your server.js file where you define other routes
-const scheduleRoutes = require('./routes/scheduleRoutes');
-app.use('/api/schedule', scheduleRoutes);
-
 
 // Add ads routes
 const adRoutes = require('./routes/adRoutes');
@@ -93,6 +93,10 @@ app.use('/api/caption', captionRoutes);
 // Add social media routes
 const socialMediaRoutes = require('./routes/socialMedia');
 app.use('/api/social-media', socialMediaRoutes);
+
+// Add post routes
+const postRoutes = require('./routes/postRoutes');
+app.use('/api/posts', postRoutes);
 
 // Serve static assets in production
 if (process.env.NODE_ENV === 'production') {

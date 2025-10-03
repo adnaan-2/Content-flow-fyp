@@ -13,7 +13,7 @@ const postSchema = new mongoose.Schema({
   },
   platform: {
     type: String,
-    enum: ['facebook', 'instagram', 'linkedin', 'twitter'],
+    enum: ['facebook', 'instagram', 'linkedin', 'x', 'twitter'],
     required: true
   },
   postId: {
@@ -25,8 +25,13 @@ const postSchema = new mongoose.Schema({
     mediaUrls: [String],
     mediaType: {
       type: String,
-      enum: ['photo', 'video', 'carousel', 'text']
+      enum: ['photo', 'video', 'carousel', 'text'],
+      default: 'text'
     }
+  },
+  // Facebook specific
+  facebookPageId: {
+    type: String // For posting to specific Facebook pages
   },
   scheduledTime: Date,
   publishedTime: Date,
@@ -34,6 +39,12 @@ const postSchema = new mongoose.Schema({
     type: String,
     enum: ['draft', 'scheduled', 'published', 'failed'],
     default: 'draft'
+  },
+  // Error details for failed posts
+  errorMessage: String,
+  retryCount: {
+    type: Number,
+    default: 0
   },
   analytics: {
     likes: { type: Number, default: 0 },

@@ -88,5 +88,34 @@ export const adService = {
   deleteAd: (id) => api.delete(`/api/ads/${id}`),
 };
 
+// Post services for social media
+export const postService = {
+  // Post immediately to social media
+  postNow: (postData) => api.post('/api/posts/now', postData),
+  
+  // Schedule a post
+  schedulePost: (postData) => api.post('/api/posts/schedule', postData),
+  
+  // Get user's posts with filtering
+  getUserPosts: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return api.get(`/api/posts${query ? `?${query}` : ''}`);
+  },
+  
+  // Get scheduled posts
+  getScheduledPosts: () => api.get('/api/posts/scheduled'),
+  
+  // Cancel scheduled post
+  cancelScheduledPost: (postId) => api.put(`/api/posts/${postId}/cancel`),
+  
+  // Delete post
+  deletePost: (postId) => api.delete(`/api/posts/${postId}`),
+
+  // Test Instagram posting
+  testInstagramPosting: (testData) => api.post('/api/posts/test/instagram', testData),
+
+  // Test X posting
+  testXPosting: (testData) => api.post('/api/posts/test/x', testData)
+};
 
 export default api;

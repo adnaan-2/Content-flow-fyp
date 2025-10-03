@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-import { mediaService, adService } from '@/services/api';
+import { mediaService, adService, postService } from '@/services/api';
 
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from "@/components/ui/card";
@@ -12,6 +12,7 @@ import 'react-calendar/dist/Calendar.css';
 import { Separator } from "@/components/ui/separator";
 import { CheckCircle, Plus, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
+import { validatePostContent, canPost, formatValidationErrors } from "@/utils/postValidation";
 
 const platforms = [
   { 
@@ -52,6 +53,7 @@ const UploadMedia = () => {
   const [scheduledDate, setScheduledDate] = useState(new Date());
   const [scheduledTime, setScheduledTime] = useState("10:00");
   const [isGeneratingCaption, setIsGeneratingCaption] = useState(false);
+  const [isPosting, setIsPosting] = useState(false);
   const [connectedAccounts, setConnectedAccounts] = useState<any[]>([]);
 
   // Fetch imported media from Cloudinary on mount
@@ -166,18 +168,178 @@ const UploadMedia = () => {
   };
 
   // Post Now
-  const handlePostNow = () => {
-    if ((mediaFiles.length === 0 && !generatedImage) || selectedPlatforms.length === 0) {
-      toast({ title: "Select media and platforms", variant: "destructive" });
+  const handlePostNow = async () => {
+    // Get selected images data to extract URLs
+    const selectedImagesData = [...importedMedia, ...generatedMedia].filter(item => 
+      selectedImages.includes(item._id)
+    );
+    const mediaUrls = selectedImagesData.map(item => item.url || item.imageUrl);
+
+    // Validate content
+    const validationErrors = validatePostContent({
+      caption,
+      mediaUrls,
+      platforms: selectedPlatforms
+    });
+
+    if (validationErrors.length > 0) {
+      toast({ 
+        title: "Validation failed", 
+        description: formatValidationErrors(validationErrors),
+        variant: "destructive" 
+      });
       return;
     }
-    toast({ title: "Posted!", description: `Posted to ${selectedPlatforms.join(", ")}` });
+
+    setIsPosting(true);
+    
+    // Show special message for Instagram
+    if (selectedPlatforms.includes('instagram')) {
+      toast({
+        title: "Processing...",
+        description: "Instagram posts may take 30-60 seconds to process. Please wait...",
+      });
+    }
+
+    try {
+      // Map platform IDs to backend platform names
+      const platformMapping: { [key: string]: string } = {
+        'facebook': 'facebook',
+        'instagram': 'instagram', 
+        'twitter': 'x',
+        'linkedin': 'linkedin'
+      };
+      
+      const mappedPlatforms = selectedPlatforms.map(platform => platformMapping[platform] || platform);
+      
+      const postData = {
+        caption,
+        mediaUrls,
+        platforms: mappedPlatforms,
+        mediaType: 'photo',
+        facebookPageId: null // You can add page selection logic here
+      };
+
+      console.log('📤 Sending post data:', postData);
+      console.log('� Platform mapping:', selectedPlatforms, '→', mappedPlatforms);
+      console.log('�📸 Selected images:', selectedImages);
+      console.log('🔗 Media URLs:', mediaUrls);
+
+      const response = await postService.postNow(postData);
+      
+      toast({ 
+        title: "Posted successfully!", 
+        description: `Posted to ${response.data.results.map(r => r.platform).join(", ")}` 
+      });
+
+      // Reset form
+      setSelectedImages([]);
+      setCaption('');
+      setSelectedPlatforms([]);
+
+      // Show any errors if some platforms failed
+      if (response.data.errors && response.data.errors.length > 0) {
+        toast({
+          title: "Some posts failed",
+          description: response.data.errors.join(", "),
+          variant: "destructive"
+        });
+      }
+
+    } catch (error) {
+      console.error('Post now error:', error);
+      const errorMessage = error.response?.data?.error || "Could not post to social media. Please try again.";
+      
+      // Special handling for Instagram timeout errors
+      if (errorMessage.includes('took too long to process') || errorMessage.includes('Instagram')) {
+        toast({ 
+          title: "Instagram Processing Delay", 
+          description: "Instagram is taking longer than usual to process your media. Please try again in a few minutes.",
+          variant: "destructive" 
+        });
+      } else {
+        toast({ 
+          title: "Posting failed", 
+          description: errorMessage,
+          variant: "destructive" 
+        });
+      }
+    } finally {
+      setIsPosting(false);
+    }
   };
 
   // Schedule Post
-  const handleSchedulePost = () => {
-    setShowScheduleDialog(false);
-    toast({ title: "Post scheduled!", description: `Scheduled for ${scheduledDate} at ${scheduledTime}` });
+  const handleSchedulePost = async () => {
+    // Get selected images data to extract URLs
+    const selectedImagesData = [...importedMedia, ...generatedMedia].filter(item => 
+      selectedImages.includes(item._id)
+    );
+    const mediaUrls = selectedImagesData.map(item => item.url || item.imageUrl);
+
+    // Validate content
+    const validationErrors = validatePostContent({
+      caption,
+      mediaUrls,
+      platforms: selectedPlatforms
+    });
+
+    if (validationErrors.length > 0) {
+      toast({ 
+        title: "Validation failed", 
+        description: formatValidationErrors(validationErrors),
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    try {
+      // Combine date and time
+      const scheduleDateTime = new Date(scheduledDate);
+      const [hours, minutes] = scheduledTime.split(':');
+      scheduleDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+
+      // Map platform IDs to backend platform names
+      const platformMapping: { [key: string]: string } = {
+        'facebook': 'facebook',
+        'instagram': 'instagram', 
+        'twitter': 'x',
+        'linkedin': 'linkedin'
+      };
+      
+      const mappedPlatforms = selectedPlatforms.map(platform => platformMapping[platform] || platform);
+
+      const postData = {
+        caption,
+        mediaUrls,
+        platforms: mappedPlatforms,
+        scheduledTime: scheduleDateTime.toISOString(),
+        mediaType: 'photo',
+        facebookPageId: null // You can add page selection logic here
+      };
+
+      const response = await postService.schedulePost(postData);
+      
+      setShowScheduleDialog(false);
+      
+      toast({ 
+        title: "Post scheduled successfully!", 
+        description: `Scheduled for ${scheduledDate.toLocaleDateString()} at ${scheduledTime} on ${response.data.platforms.join(", ")}` 
+      });
+
+      // Reset form
+      setSelectedImages([]);
+      setCaption('');
+      setSelectedPlatforms([]);
+
+    } catch (error) {
+      console.error('Schedule post error:', error);
+      toast({ 
+        title: "Scheduling failed", 
+        description: error.response?.data?.error || "Could not schedule post. Please try again.",
+        variant: "destructive" 
+      });
+    }
   };
 
   // AI Caption Generation
@@ -359,15 +521,22 @@ const UploadMedia = () => {
             <div className="flex gap-2">
                 <Button
                   className="flex-1"
-                  disabled={selectedImages.length === 0 || selectedPlatforms.length === 0}
+                  disabled={selectedImages.length === 0 || selectedPlatforms.length === 0 || isPosting}
                   onClick={handlePostNow}
                 >
-                  Post Now
+                  {isPosting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      {selectedPlatforms.includes('instagram') ? 'Processing Instagram...' : 'Posting...'}
+                    </>
+                  ) : (
+                    'Post Now'
+                  )}
                 </Button>
                 <Button
                   variant="outline"
                   className="flex-1"
-                  disabled={selectedImages.length === 0 || selectedPlatforms.length === 0}
+                  disabled={selectedImages.length === 0 || selectedPlatforms.length === 0 || isPosting}
                   onClick={() => setShowScheduleDialog(true)}
                 >
                   Post Later
@@ -402,6 +571,7 @@ const UploadMedia = () => {
                     }`}
                     onClick={() => togglePlatformSelection(platform.id)}
                     disabled={!isConnected}
+                    title={!isConnected ? `Connect your ${platform.name} account first` : ''}
                   >
                     <div className="h-8 w-8 rounded-full overflow-hidden flex items-center justify-center border border-gray-300/30 shadow-sm">
                       <img 
@@ -451,6 +621,21 @@ const UploadMedia = () => {
                       </div>
                     )}
                   </button>
+
+                  {/* Show platform-specific notes */}
+                  {isSelected && platform.id === 'twitter' && (
+                    <div className="mt-2 ml-8 p-2 bg-blue-50 border border-blue-200 rounded-md text-xs">
+                      <p className="text-blue-800 font-medium">ℹ️ X (Twitter) Note:</p>
+                      <p className="text-blue-600">Text content is required. Images are optional.</p>
+                    </div>
+                  )}
+                  
+                  {isSelected && platform.id === 'instagram' && (
+                    <div className="mt-2 ml-8 p-2 bg-purple-50 border border-purple-200 rounded-md text-xs">
+                      <p className="text-purple-800 font-medium">📸 Instagram Note:</p>
+                      <p className="text-purple-600">At least one image required. May take 30-60 seconds to process.</p>
+                    </div>
+                  )}
 
                   {/* Show Facebook Pages as sub-options when selected */}
                   {platform.id === 'facebook' && isSelected && isConnected && (
