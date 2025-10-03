@@ -8,6 +8,7 @@ import { EyeIcon, EyeOffIcon, LogInIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { authService } from "@/services/api";
 import { useAuth } from "@/contexts/AuthContext";
+import GoogleSignInButton from "@/components/auth/GoogleSignInButton";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -75,11 +76,26 @@ const Login = () => {
         return;
       }
       
-      const errorMessage = errorData?.message || "Login failed. Please check your credentials.";
+      let errorMessage = errorData?.message || "Login failed. Please check your credentials.";
+      let toastDescription = errorMessage;
+      
+      // Handle specific conflict types with actionable guidance
+      if (errorData?.conflictType) {
+        switch (errorData.conflictType) {
+          case 'google_oauth_account':
+            toastDescription = errorData.message + " Use the 'Sign in with Google' button below.";
+            break;
+          case 'no_password':
+            toastDescription = errorData.message + " Try 'Forgot Password?' or 'Sign in with Google'.";
+            break;
+          default:
+            toastDescription = errorMessage;
+        }
+      }
       
       toast({
         title: "Login failed",
-        description: errorMessage,
+        description: toastDescription,
         variant: "destructive",
       });
     } finally {
@@ -162,6 +178,17 @@ const Login = () => {
                 )}
               </Button>
             </form>
+            
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-gray-600" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-gray-800 px-2 text-gray-400">Or continue with</span>
+              </div>
+            </div>
+            
+            <GoogleSignInButton type="signin" />
           </CardContent>
           <CardFooter className="flex flex-col">
             <p className="mt-2 text-center text-sm">

@@ -1,9 +1,13 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
 export default function AuthCallback() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { login } = useAuth();
+  const { toast } = useToast();
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
   const [message, setMessage] = useState('Processing authentication...');
 
@@ -11,166 +15,136 @@ export default function AuthCallback() {
     const processCallback = async () => {
       try {
         const urlParams = new URLSearchParams(location.search);
-        const code = urlParams.get('code');
-        const platform = urlParams.get('platform');
+        const token = urlParams.get('token');
+        const userParam = urlParams.get('user');
         const error = urlParams.get('error');
-        const oauth_token = urlParams.get('oauth_token');
-        const oauth_verifier = urlParams.get('oauth_verifier');
-
-        console.log('AuthCallback - Platform:', platform, 'Code:', code?.substring(0, 20) + '...', 'OAuth Token:', oauth_token?.substring(0, 20) + '...');
 
         if (error) {
           setStatus('error');
-          setMessage(`Authentication failed: ${error}`);
-          // Send error to parent window
-          if (window.opener) {
-            window.opener.postMessage({ 
-              type: 'AUTH_ERROR', 
-              platform, 
-              error: error 
-            }, window.location.origin);
-          }
-          return;
-        }
-
-        // Check for OAuth 2.0 or OAuth 1.0a parameters
-        const hasOAuth2 = code && platform;
-        const hasOAuth1 = oauth_token && oauth_verifier && platform;
-
-        if (!hasOAuth2 && !hasOAuth1) {
-          setStatus('error');
-          setMessage('Missing authorization code or platform information');
-          return;
-        }
-
-        setMessage(`Connecting your ${platform} account...`);
-
-        // Prepare request body based on OAuth version
-        const requestBody = hasOAuth1 
-          ? { oauth_token, oauth_verifier }
-          : { code };
-
-        // Send parameters to backend for token exchange
-        const token = localStorage.getItem('token');
-        const response = await fetch(`/api/social-media/auth/${platform}/callback`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(requestBody)
-        });
-
-        const result = await response.json();
-
-        if (response.ok && result.success) {
-          setStatus('success');
-          setMessage(`${platform} account connected successfully!`);
+          let errorMessage = 'Authentication failed';
           
-          // Try multiple methods to communicate success
-          try {
-            // Method 1: postMessage (may fail due to CORS)
-            if (window.opener && !window.opener.closed) {
-              window.opener.postMessage({ 
-                type: 'AUTH_SUCCESS', 
-                platform,
-                message: result.message,
-                account: result.account
-              }, window.location.origin);
-            }
-          } catch (e) {
-
+          switch(error) {
+            case 'authentication_failed':
+              errorMessage = 'Google authentication failed. Please try again.';
+              break;
+            case 'google_auth_failed':
+              errorMessage = 'Google authentication was cancelled or failed.';
+              break;
+            case 'server_error':
+              errorMessage = 'Server error during authentication. Please try again.';
+              break;
+            case 'account_conflict':
+              errorMessage = 'This email is already registered with a different method. Please sign in with your email and password instead.';
+              break;
+            default:
+              errorMessage = `Authentication failed: ${error}`;
           }
           
-          // Method 2: localStorage communication as fallback
-          const authResult = {
-            type: 'AUTH_SUCCESS',
-            platform,
-            message: result.message,
-            account: result.account,
-            timestamp: Date.now()
-          };
+          setMessage(errorMessage);
           
-          localStorage.setItem('auth_result', JSON.stringify(authResult));
+          toast({
+            title: "Authentication Failed",
+            description: errorMessage,
+            variant: "destructive",
+          });
           
-          // Close popup after 2 seconds
           setTimeout(() => {
-            window.close();
-          }, 2000);
+            navigate('/login');
+          }, 3000);
+          return;
+        }
 
-        } else {
+        if (!token || !userParam) {
           setStatus('error');
-          setMessage(result.error || `Failed to connect ${platform} account`);
+          setMessage('Missing authentication data');
           
-          // Send error to parent window
-          if (window.opener) {
-            window.opener.postMessage({ 
-              type: 'AUTH_ERROR', 
-              platform, 
-              error: result.error || 'Connection failed' 
-            }, window.location.origin);
-          }
+          toast({
+            title: "Authentication Error",
+            description: "Missing authentication data. Please try again.",
+            variant: "destructive",
+          });
+          
+          setTimeout(() => {
+            navigate('/login');
+          }, 3000);
+          return;
         }
 
-      } catch (error) {
-        console.error('Auth callback error:', error);
-        setStatus('error');
-        setMessage('An unexpected error occurred during authentication');
+        const userData = JSON.parse(decodeURIComponent(userParam));
         
-        if (window.opener) {
-          window.opener.postMessage({ 
-            type: 'AUTH_ERROR', 
-            platform: 'unknown', 
-            error: 'Unexpected error occurred' 
-          }, window.location.origin);
-        }
+        setStatus('success');
+        setMessage('Authentication successful! Redirecting...');
+        
+        login(token, userData);
+        
+        toast({
+          title: "Welcome!",
+          description: `Successfully signed in with Google as ${userData.name}`,
+        });
+        
+        navigate('/dashboard', { replace: true });
+        
+      } catch (error) {
+        console.error('AuthCallback processing error:', error);
+        setStatus('error');
+        setMessage('Failed to process authentication. Please try again.');
+        
+        toast({
+          title: "Authentication Error",
+          description: "Failed to process authentication. Please try again.",
+          variant: "destructive",
+        });
+        
+        setTimeout(() => {
+          navigate('/login');
+        }, 3000);
       }
     };
 
     processCallback();
-  }, [location]);
+  }, [location, navigate, login, toast]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center p-6">
-      <div className="bg-gray-800/50 backdrop-blur-sm rounded-2xl p-8 max-w-md w-full text-center border border-gray-700/50">
-        {status === 'processing' && (
-          <>
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-            <h2 className="text-xl font-semibold text-white mb-2">Connecting Account</h2>
-            <p className="text-gray-400">{message}</p>
-          </>
-        )}
-        
-        {status === 'success' && (
-          <>
-            <div className="rounded-full h-12 w-12 bg-green-500 mx-auto mb-4 flex items-center justify-center">
-              <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <h2 className="text-xl font-semibold text-green-400 mb-2">Success!</h2>
-            <p className="text-gray-300">{message}</p>
-            <p className="text-gray-500 text-sm mt-2">This window will close automatically...</p>
-          </>
-        )}
-        
-        {status === 'error' && (
-          <>
-            <div className="rounded-full h-12 w-12 bg-red-500 mx-auto mb-4 flex items-center justify-center">
-              <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </div>
-            <h2 className="text-xl font-semibold text-red-400 mb-2">Connection Failed</h2>
-            <p className="text-gray-300">{message}</p>
-            <button 
-              onClick={() => window.close()} 
-              className="mt-4 px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg transition-colors"
-            >
-              Close Window
-            </button>
-          </>
-        )}
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-900 via-slate-900 to-black p-4">
+      <div className="w-full max-w-md animate-fade-in">
+        <div className="border border-gray-700 bg-gray-800/90 backdrop-blur-lg shadow-2xl rounded-lg p-8 text-center">
+          <div className="space-y-4">
+            {status === 'processing' && (
+              <>
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-r from-blue-500 to-purple-500">
+                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                </div>
+                <h2 className="text-xl font-bold text-white">Processing...</h2>
+                <p className="text-gray-300">{message}</p>
+              </>
+            )}
+            
+            {status === 'success' && (
+              <>
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-r from-green-500 to-blue-500">
+                  <svg className="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h2 className="text-xl font-bold text-green-400">Success!</h2>
+                <p className="text-gray-300">{message}</p>
+              </>
+            )}
+            
+            {status === 'error' && (
+              <>
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-r from-red-500 to-orange-500">
+                  <svg className="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </div>
+                <h2 className="text-xl font-bold text-red-400">Authentication Failed</h2>
+                <p className="text-gray-300">{message}</p>
+                <p className="text-sm text-gray-400">Redirecting to login page...</p>
+              </>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

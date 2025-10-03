@@ -1,15 +1,19 @@
 const express = require('express');
 const dotenv = require('dotenv');
+
+// Load environment variables FIRST before any other imports
+dotenv.config();
+
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const session = require('express-session');
+const passport = require('./config/passport');
 const connectDB = require('./config/db');
 const path = require('path');
 const authRoutes = require('./routes/authRoutes');
 const fs = require('fs');
 const uploadDir = path.join(__dirname, 'uploads/profile');
-
-dotenv.config();
 
 // Connect to database
 connectDB();
@@ -47,6 +51,21 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Session configuration for Passport
+app.use(session({
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
+
+// Passport middleware
+app.use(passport.initialize());
+app.use(passport.session());
+
 // Add near your other middleware setup
 
 // Increase payload size limits
@@ -60,9 +79,16 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('combined'));
 }
 
-// Request logger
+// Request logger with detailed debugging
 app.use((req, res, next) => {
   console.log(`${req.method} ${req.url}`);
+  
+  // Log request body for POST/PUT requests
+  if (req.method === 'POST' || req.method === 'PUT') {
+    console.log('Request body:', req.body);
+    console.log('Content-Type:', req.headers['content-type']);
+  }
+  
   next();
 });
 

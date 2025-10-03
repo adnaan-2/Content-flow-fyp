@@ -46,8 +46,25 @@ api.interceptors.response.use(
 
 // Authentication services
 export const authService = {
-  register: (userData) => api.post('/api/auth/register', userData),
-  login: (credentials) => api.post('/api/auth/login', credentials),
+  register: (userData: { name: string; email: string; password: string }) => {
+    console.log('API call - register with data:', userData);
+    return api.post('/api/auth/register', userData);
+  },
+  login: (credentials: { email: string; password: string }) => api.post('/api/auth/login', credentials),
+  forgotPassword: (data: { email: string }) => {
+    console.log('API call - forgot password with email:', data.email);
+    return api.post('/api/auth/forgot-password', data);
+  },
+  verifyResetCode: (data: { email: string; verificationCode: string }) => {
+    console.log('API call - verify reset code for email:', data.email);
+    return api.post('/api/auth/verify-reset-code', data);
+  },
+  resetPassword: (data: { token: string; newPassword: string; confirmPassword: string }) => {
+    console.log('API call - reset password with token:', data.token);
+    return api.post('/api/auth/reset-password', data);
+  },
+  verifyEmail: (data: { userId: string; verificationCode: string }) => api.post('/api/auth/verify-email', data),
+  resendVerification: (data: { userId: string }) => api.post('/api/auth/resend-verification', data),
   getProfile: () => api.get('/api/profile'),
   updateProfile: (profileData) => api.put('/api/profile/update', profileData),
   uploadProfileImage: (formData) => {

@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { EyeIcon, EyeOffIcon, UserPlusIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { authService } from "@/services/api";
+import GoogleSignInButton from "@/components/auth/GoogleSignInButton";
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -47,14 +48,20 @@ const Signup = () => {
       // Remove confirmPassword before sending to API
       const { confirmPassword, ...signupData } = formData;
       
+      console.log('Submitting signup data:', signupData);
+      
       // Call the real API endpoint
       const response = await authService.register(signupData);
+      
+      console.log('Signup response:', response.data);
       
       if (response.data.requiresVerification) {
         // Show success toast
         toast({
           title: "Registration successful!",
-          description: "Please check your email for verification code",
+          description: response.data.emailWarning 
+            ? "Account created but verification email failed. Please contact support." 
+            : "Please check your email for verification code",
         });
         
         // Navigate to email verification page
@@ -78,11 +85,45 @@ const Signup = () => {
         navigate("/dashboard", { replace: true });
       }
     } catch (err: any) {
-      const errorMessage = err.response?.data?.message || "Registration failed. Please try again.";
+      console.error('Signup error:', err);
+      console.error('Error response:', err.response);
+      
+      let errorMessage = "Registration failed. Please try again.";
+      let toastDescription = errorMessage;
+      
+      if (err.response?.data) {
+        const errorData = err.response.data;
+        errorMessage = errorData.message || errorMessage;
+        
+        // Handle specific conflict types with actionable guidance
+        switch (errorData.conflictType) {
+          case 'google_account_exists':
+            toastDescription = errorData.message + " Click 'Sign in with Google' below.";
+            break;
+          case 'email_account_exists':
+            toastDescription = errorData.message + " Try signing in with your password instead.";
+            break;
+          case 'unverified_email_account':
+            toastDescription = errorData.message + " Check your email for the verification code.";
+            break;
+          default:
+            toastDescription = errorMessage;
+        }
+      } else if (err.response?.status === 400) {
+        errorMessage = "Invalid data provided. Please check all fields.";
+        toastDescription = errorMessage;
+      } else if (err.response?.status === 500) {
+        errorMessage = "Server error. Please try again later.";
+        toastDescription = errorMessage;
+      } else if (err.message) {
+        errorMessage = err.message;
+        toastDescription = errorMessage;
+      }
+      
       setError(errorMessage);
       toast({
         title: "Registration failed",
-        description: errorMessage,
+        description: toastDescription,
         variant: "destructive",
       });
     } finally {
@@ -203,6 +244,17 @@ const Signup = () => {
                 )}
               </Button>
             </form>
+            
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-gray-600" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-gray-800 px-2 text-gray-400">Or continue with</span>
+              </div>
+            </div>
+            
+            <GoogleSignInButton type="signup" />
           </CardContent>
           <CardFooter className="flex flex-col">
             <p className="mt-2 text-center text-sm">

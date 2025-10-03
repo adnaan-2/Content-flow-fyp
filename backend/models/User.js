@@ -14,7 +14,18 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: true
+    required: function() {
+      return !this.googleId; // Password not required if user signs up with Google
+    }
+  },
+  googleId: {
+    type: String,
+    default: null
+  },
+  authProvider: {
+    type: String,
+    enum: ['local', 'google'],
+    default: 'local'
   },
   profilePicture: {
     type: String,
@@ -37,6 +48,22 @@ const userSchema = new mongoose.Schema({
     default: null
   },
   verificationCodeExpires: {
+    type: Date,
+    default: null
+  },
+  passwordResetToken: {
+    type: String,
+    default: null
+  },
+  passwordResetExpires: {
+    type: Date,
+    default: null
+  },
+  passwordResetCode: {
+    type: String,
+    default: null
+  },
+  passwordResetCodeExpires: {
     type: Date,
     default: null
   },
