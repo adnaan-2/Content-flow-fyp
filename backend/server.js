@@ -19,7 +19,7 @@ const uploadDir = path.join(__dirname, 'uploads/profile');
 connectDB();
 
 // Initialize post scheduler
-const { initializeScheduler } = require('./controllers/postController');
+const { initializeScheduler } = require('./controllers/scheduleController');
 initializeScheduler();
 
 // Create uploads directory if it doesn't exist
@@ -123,6 +123,10 @@ app.use('/api/social-media', socialMediaRoutes);
 // Add post routes
 const postRoutes = require('./routes/postRoutes');
 app.use('/api/posts', postRoutes);
+
+// Schedule routes
+const scheduleRoutes = require('./routes/scheduleRoutes');
+app.use('/api/schedule', scheduleRoutes);
 
 // Serve static assets in production
 if (process.env.NODE_ENV === 'production') {

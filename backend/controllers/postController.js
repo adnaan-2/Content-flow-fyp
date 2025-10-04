@@ -1,10 +1,6 @@
 const Post = require('../models/Post');
 const SocialAccount = require('../models/SocialAccount');
 const axios = require('axios');
-const schedule = require('node-schedule');
-
-// Store scheduled jobs in memory (in production, use Redis or a persistent queue)
-const scheduledJobs = new Map();
 
 // Helper function to check Instagram media container status
 const checkInstagramMediaStatus = async (igUserId, creationId, accessToken) => {
@@ -852,141 +848,6 @@ const postNow = async (req, res) => {
   }
 };
 
-// Schedule a post
-const schedulePost = async (req, res) => {
-  try {
-    const {
-      caption,
-      mediaUrls,
-      platforms,
-      scheduledTime,
-      mediaType = 'photo',
-      facebookPageId = null
-    } = req.body;
-
-    const userId = req.user.id;
-
-    // Validate input
-    if (!platforms || platforms.length === 0) {
-      return res.status(400).json({ error: 'No platforms selected' });
-    }
-
-    if (!caption && (!mediaUrls || mediaUrls.length === 0)) {
-      return res.status(400).json({ error: 'Either caption or media is required' });
-    }
-
-    if (!scheduledTime) {
-      return res.status(400).json({ error: 'Scheduled time is required' });
-    }
-
-    const scheduleDate = new Date(scheduledTime);
-    if (scheduleDate <= new Date()) {
-      return res.status(400).json({ error: 'Scheduled time must be in the future' });
-    }
-
-    const scheduledPosts = [];
-
-    // Create scheduled post records for each platform
-    for (const platform of platforms) {
-      try {
-        const account = await getSocialAccount(userId, platform);
-        if (!account) {
-          continue; // Skip if no account found
-        }
-
-        const scheduledPost = new Post({
-          userId,
-          socialAccountId: account._id,
-          platform,
-          postId: 'scheduled',
-          content: {
-            text: caption,
-            mediaUrls: mediaUrls || [],
-            mediaType
-          },
-          scheduledTime: scheduleDate,
-          status: 'scheduled'
-        });
-
-        await scheduledPost.save();
-        scheduledPosts.push(scheduledPost);
-
-      } catch (error) {
-        console.error(`Error creating scheduled post for ${platform}:`, error);
-      }
-    }
-
-    if (scheduledPosts.length === 0) {
-      return res.status(400).json({ error: 'No valid accounts found for selected platforms' });
-    }
-
-    // Schedule the job
-    const jobId = `post_${Date.now()}_${userId}`;
-    const job = schedule.scheduleJob(scheduleDate, async () => {
-      console.log(`Executing scheduled post job: ${jobId}`);
-      
-      for (const post of scheduledPosts) {
-        try {
-          const account = await SocialAccount.findById(post.socialAccountId);
-          if (!account || !account.isActive) {
-            await Post.findByIdAndUpdate(post._id, { 
-              status: 'failed',
-              publishedTime: new Date()
-            });
-            continue;
-          }
-
-          // Post to platform
-          const postId = await postToSocialMedia(
-            account, 
-            post.content, 
-            platform === 'facebook' ? facebookPageId : null
-          );
-
-          // Update post record
-          await Post.findByIdAndUpdate(post._id, {
-            postId,
-            status: 'published',
-            publishedTime: new Date()
-          });
-
-          console.log(`Successfully posted scheduled content to ${post.platform}`);
-
-        } catch (error) {
-          console.error(`Error executing scheduled post for ${post.platform}:`, error);
-          await Post.findByIdAndUpdate(post._id, { 
-            status: 'failed',
-            errorMessage: error.message,
-            publishedTime: new Date()
-          });
-        }
-      }
-
-      // Clean up job from memory
-      scheduledJobs.delete(jobId);
-    });
-
-    // Store job reference
-    scheduledJobs.set(jobId, {
-      job,
-      postIds: scheduledPosts.map(p => p._id),
-      scheduledTime: scheduleDate
-    });
-
-    res.json({
-      message: 'Posts scheduled successfully',
-      jobId,
-      scheduledTime: scheduleDate,
-      postsCount: scheduledPosts.length,
-      platforms: scheduledPosts.map(p => p.platform)
-    });
-
-  } catch (error) {
-    console.error('Schedule post error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
 // Get user's posts
 const getUserPosts = async (req, res) => {
   try {
@@ -1019,63 +880,6 @@ const getUserPosts = async (req, res) => {
 
   } catch (error) {
     console.error('Get user posts error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
-// Get scheduled posts
-const getScheduledPosts = async (req, res) => {
-  try {
-    const userId = req.user.id;
-
-    const scheduledPosts = await Post.find({
-      userId,
-      status: 'scheduled',
-      scheduledTime: { $gt: new Date() }
-    })
-      .populate('socialAccountId', 'platform accountName')
-      .sort({ scheduledTime: 1 });
-
-    res.json({ scheduledPosts });
-
-  } catch (error) {
-    console.error('Get scheduled posts error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
-// Cancel scheduled post
-const cancelScheduledPost = async (req, res) => {
-  try {
-    const { postId } = req.params;
-    const userId = req.user.id;
-
-    const post = await Post.findOne({
-      _id: postId,
-      userId,
-      status: 'scheduled'
-    });
-
-    if (!post) {
-      return res.status(404).json({ error: 'Scheduled post not found' });
-    }
-
-    // Find and cancel the scheduled job
-    for (const [jobId, jobData] of scheduledJobs.entries()) {
-      if (jobData.postIds.includes(postId)) {
-        jobData.job.cancel();
-        scheduledJobs.delete(jobId);
-        break;
-      }
-    }
-
-    // Update post status
-    await Post.findByIdAndUpdate(postId, { status: 'draft' });
-
-    res.json({ message: 'Scheduled post cancelled successfully' });
-
-  } catch (error) {
-    console.error('Cancel scheduled post error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -1283,13 +1087,10 @@ const initializeScheduler = async () => {
 
 module.exports = {
   postNow,
-  schedulePost,
   getUserPosts,
-  getScheduledPosts,
-  cancelScheduledPost,
   deletePost,
-  getSchedulerStatus,
+  postToSocialMedia,
   testInstagramPosting,
   testXPosting,
-  initializeScheduler
+  getSocialAccount
 };
