@@ -420,7 +420,7 @@ export default function SchedulePost() {
     return (
       <div className="w-full h-full">
         {/* Calendar Header */}
-        <div className="flex items-center justify-between mb-6 bg-gray-800 border border-gray-600 rounded-xl p-6 shadow-xl">
+        <div className="flex items-center justify-between mb-6 bg-black border border-gray-800 rounded-xl p-6 shadow-xl">
           <div className="flex items-center gap-4">
             <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
               {monthNames[currentMonth]} {currentYear}
@@ -500,7 +500,7 @@ export default function SchedulePost() {
         {/* Weekday Headers */}
         <div className="grid grid-cols-7 gap-3 mb-4">
           {weekdays.map(day => (
-            <div key={day} className="text-center font-bold text-white py-4 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl shadow-lg">
+            <div key={day} className="text-center font-bold text-white py-4 bg-black rounded-xl border border-gray-800">
               {day}
             </div>
           ))}
@@ -510,7 +510,7 @@ export default function SchedulePost() {
         <div className="grid grid-cols-7 gap-3 h-[calc(100vh-200px)]">
           {calendarDays.map((date, index) => {
             if (!date) {
-              return <div key={index} className="bg-gray-700/50 border border-gray-600 rounded-xl"></div>;
+              return <div key={index} className="bg-black border border-gray-800 rounded-xl"></div>;
             }
             
             const postsForDay = getPostsForDate(date);
@@ -533,11 +533,11 @@ export default function SchedulePost() {
               <div
                 key={index}
                 className={cn(
-                  "bg-gray-800 border border-gray-600 rounded-xl p-3 transition-all duration-300 flex flex-col shadow-lg min-h-[140px]",
-                  hasScheduledPosts ? "cursor-pointer hover:shadow-xl hover:border-purple-400 hover:-translate-y-1 hover:bg-gray-700" : "cursor-default",
-                  isToday && "bg-gradient-to-br from-blue-800/80 to-purple-800/80 border-blue-400 ring-2 ring-blue-400/40",
-                  hasScheduledPosts && "bg-gradient-to-br from-purple-800/80 via-pink-800/80 to-blue-800/80 border-purple-400 shadow-xl",
-                  isSelected && "ring-2 ring-purple-400 shadow-2xl transform scale-105 bg-purple-800/60"
+                  "bg-black border border-gray-800 rounded-xl p-3 transition-all duration-300 flex flex-col shadow-lg min-h-[140px]",
+                  hasScheduledPosts ? "cursor-pointer hover:shadow-xl hover:border-purple-400 hover:-translate-y-1 hover:bg-gray-900" : "cursor-default",
+                  isToday && "bg-gradient-to-br from-blue-900/50 to-purple-900/50 border-blue-400 ring-2 ring-blue-400/40",
+                  hasScheduledPosts && "bg-gradient-to-br from-purple-900/50 via-pink-900/50 to-blue-900/50 border-purple-400 shadow-xl",
+                  isSelected && "ring-2 ring-purple-400 shadow-2xl transform scale-105 bg-purple-900/30"
                 )}
                 onClick={handleDateClick}
               >
@@ -586,7 +586,7 @@ export default function SchedulePost() {
                   </div>
                 ) : (
                   <div className="mt-auto text-center">
-                    <div className="text-xs text-gray-500 opacity-50">
+                    <div className="text-xs text-white-500 opacity-70">
                       No posts scheduled
                     </div>
                   </div>
@@ -600,12 +600,12 @@ export default function SchedulePost() {
   };
 
   return (
-    <div className="h-screen w-full p-6 bg-gray-900">
+    <div className="h-screen w-full p-6 bg-black">
       <CustomCalendar />
       
       {/* Posts List Modal/Sidebar for Selected Date */}
       {showSidebar && selectedDate && getPostsForDate(selectedDate).length > 0 && (
-        <Card className="fixed top-6 right-6 w-80 max-h-[calc(100vh-3rem)] overflow-y-auto shadow-2xl border border-gray-600 bg-gray-800/95 backdrop-blur-md">
+        <Card className="fixed top-6 right-6 w-80 max-h-[calc(100vh-3rem)] overflow-y-auto shadow-2xl border border-gray-800 bg-black/95 backdrop-blur-md">
           <CardHeader className="pb-3 bg-gradient-to-r from-purple-800/30 to-blue-800/30 rounded-t-lg relative">
             <Button
               variant="ghost"
@@ -760,7 +760,7 @@ export default function SchedulePost() {
 
       {/* Edit Post Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto bg-gray-800 border border-gray-600">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto bg-black border border-gray-800">
           <DialogHeader className="bg-gradient-to-r from-purple-800/30 to-blue-800/30 -m-6 mb-4 p-6 rounded-t-lg">
             <DialogTitle className="text-xl font-bold text-purple-400">Edit Scheduled Post</DialogTitle>
             <DialogDescription className="text-purple-300">
