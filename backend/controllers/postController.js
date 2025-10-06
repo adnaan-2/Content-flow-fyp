@@ -3,10 +3,6 @@ const SocialAccount = require('../models/SocialAccount');
 const User = require('../models/User');
 const notificationService = require('../utils/notificationService');
 const axios = require('axios');
-const schedule = require('node-schedule');
-
-// Store scheduled jobs in memory (in production, use Redis or a persistent queue)
-const scheduledJobs = new Map();
 
 // Helper function to check Instagram media container status
 const checkInstagramMediaStatus = async (igUserId, creationId, accessToken) => {
@@ -874,6 +870,7 @@ const postNow = async (req, res) => {
   }
 };
 
+<<<<<<< HEAD
 // Schedule a post
 const schedulePost = async (req, res) => {
   try {
@@ -1050,6 +1047,8 @@ const schedulePost = async (req, res) => {
   }
 };
 
+=======
+>>>>>>> 2ab531d7aac68495525fd758bcb25617218ecab9
 // Get user's posts
 const getUserPosts = async (req, res) => {
   try {
@@ -1082,63 +1081,6 @@ const getUserPosts = async (req, res) => {
 
   } catch (error) {
     console.error('Get user posts error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
-// Get scheduled posts
-const getScheduledPosts = async (req, res) => {
-  try {
-    const userId = req.user.id;
-
-    const scheduledPosts = await Post.find({
-      userId,
-      status: 'scheduled',
-      scheduledTime: { $gt: new Date() }
-    })
-      .populate('socialAccountId', 'platform accountName')
-      .sort({ scheduledTime: 1 });
-
-    res.json({ scheduledPosts });
-
-  } catch (error) {
-    console.error('Get scheduled posts error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
-// Cancel scheduled post
-const cancelScheduledPost = async (req, res) => {
-  try {
-    const { postId } = req.params;
-    const userId = req.user.id;
-
-    const post = await Post.findOne({
-      _id: postId,
-      userId,
-      status: 'scheduled'
-    });
-
-    if (!post) {
-      return res.status(404).json({ error: 'Scheduled post not found' });
-    }
-
-    // Find and cancel the scheduled job
-    for (const [jobId, jobData] of scheduledJobs.entries()) {
-      if (jobData.postIds.includes(postId)) {
-        jobData.job.cancel();
-        scheduledJobs.delete(jobId);
-        break;
-      }
-    }
-
-    // Update post status
-    await Post.findByIdAndUpdate(postId, { status: 'draft' });
-
-    res.json({ message: 'Scheduled post cancelled successfully' });
-
-  } catch (error) {
-    console.error('Cancel scheduled post error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -1346,13 +1288,10 @@ const initializeScheduler = async () => {
 
 module.exports = {
   postNow,
-  schedulePost,
   getUserPosts,
-  getScheduledPosts,
-  cancelScheduledPost,
   deletePost,
-  getSchedulerStatus,
+  postToSocialMedia,
   testInstagramPosting,
   testXPosting,
-  initializeScheduler
+  getSocialAccount
 };

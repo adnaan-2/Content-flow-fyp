@@ -7,12 +7,11 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription }
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import Calendar from 'react-calendar';
-import 'react-calendar/dist/Calendar.css';
 import { Separator } from "@/components/ui/separator";
-import { CheckCircle, Plus, Sparkles, Loader2 } from "lucide-react";
+import { CheckCircle, Plus, Sparkles, Loader2, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { validatePostContent, canPost, formatValidationErrors } from "@/utils/postValidation";
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, isToday, isBefore, startOfDay } from "date-fns";
 
 const platforms = [
   { 
@@ -40,6 +39,219 @@ const platforms = [
     color: "#0A66C2"
   },
 ];
+
+// Modern Calendar Component
+const ModernCalendar = ({ value, onChange }: { value: Date; onChange: (date: Date) => void }) => {
+  const [currentMonth, setCurrentMonth] = useState(value);
+  
+  // Update currentMonth when value changes (e.g., when component re-renders with different selected date)
+  useEffect(() => {
+    if (value && !isSameMonth(currentMonth, value)) {
+      setCurrentMonth(value);
+    }
+  }, [value]);
+  
+  const monthStart = startOfMonth(currentMonth);
+  const monthEnd = endOfMonth(monthStart);
+  const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  
+  const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  
+  const goToPreviousMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
+  const goToNextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
+  
+  const handleDateClick = (date: Date) => {
+    if (!isBefore(date, startOfDay(new Date()))) {
+      onChange(date);
+    }
+  };
+  
+  return (
+    <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 shadow-lg">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={goToPreviousMonth}
+          className="h-6 w-6 rounded-full bg-gray-800 hover:bg-gray-700 border border-gray-600 p-0"
+        >
+          <ChevronLeft className="h-2 w-2 text-gray-300" />
+        </Button>
+        
+        <div className="flex flex-col items-center gap-1">
+          <div className="flex items-center gap-1">
+            <CalendarIcon className="h-3 w-3 text-purple-400" />
+            <h2 className="text-sm font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+              {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+            </h2>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              const today = new Date();
+              setCurrentMonth(today);
+              onChange(today);
+            }}
+            className="h-5 px-2 text-xs bg-gray-800 hover:bg-purple-600 border border-gray-600 text-gray-300 hover:text-white"
+          >
+            Today
+          </Button>
+        </div>
+        
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={goToNextMonth}
+          className="h-6 w-6 rounded-full bg-gray-800 hover:bg-gray-700 border border-gray-600 p-0"
+        >
+          <ChevronRight className="h-2 w-2 text-gray-300" />
+        </Button>
+      </div>
+      
+      {/* Weekdays */}
+      <div className="grid grid-cols-7 gap-1 mb-2">
+        {weekdays.map(day => (
+          <div key={day} className="text-center py-1">
+            <span className="text-xs font-medium text-gray-400">{day.slice(0, 2)}</span>
+          </div>
+        ))}
+      </div>
+      
+      {/* Days */}
+      <div className="grid grid-cols-7 gap-1">
+        {days.map(day => {
+          const isSelected = isSameDay(day, value);
+          const isCurrentDay = isToday(day);
+          const isPast = isBefore(day, startOfDay(new Date()));
+          const isCurrentMonth = isSameMonth(day, currentMonth);
+          
+          return (
+            <button
+              key={day.toISOString()}
+              onClick={() => handleDateClick(day)}
+              disabled={isPast}
+              className={`
+                h-7 w-full rounded-md text-xs font-medium transition-all duration-200
+                ${isSelected 
+                  ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg transform scale-105' 
+                  : isCurrentDay
+                  ? 'bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-purple-300 border border-purple-500/30'
+                  : isPast
+                  ? 'text-gray-600 cursor-not-allowed'
+                  : isCurrentMonth
+                  ? 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                  : 'text-gray-600'
+                }
+              `}
+            >
+              {day.getDate()}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// Modern Time Picker Component
+const ModernTimePicker = ({ value, onChange }: { value: string; onChange: (time: string) => void }) => {
+  const [hours, minutes] = value.split(':');
+  const [showPicker, setShowPicker] = useState(false);
+  
+  const handleTimeChange = (newHours: string, newMinutes: string) => {
+    onChange(`${newHours.padStart(2, '0')}:${newMinutes.padStart(2, '0')}`);
+  };
+  
+  const formatTime = (time: string) => {
+    const [h, m] = time.split(':');
+    const hour12 = parseInt(h) % 12 || 12;
+    const period = parseInt(h) >= 12 ? 'PM' : 'AM';
+    return `${hour12}:${m} ${period}`;
+  };
+  
+  return (
+    <div className="relative">
+      <div 
+        onClick={() => setShowPicker(!showPicker)}
+        className="bg-gray-900 border border-gray-700 rounded-lg p-2 cursor-pointer hover:border-purple-500 transition-colors duration-200 group"
+      >
+        <div className="flex items-center justify-center gap-2">
+          <Clock className="h-3 w-3 text-purple-400 group-hover:text-purple-300" />
+          <span className="text-sm font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+            {formatTime(value)}
+          </span>
+        </div>
+      </div>
+      
+      {showPicker && (
+        <div className="absolute top-full mt-1 left-0 right-0 bg-gray-900 border border-gray-700 rounded-lg p-2 shadow-2xl z-50">
+          <div className="flex items-center justify-center gap-2">
+            {/* Hours */}
+            <div className="flex flex-col items-center">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleTimeChange(((parseInt(hours) + 1) % 24).toString(), minutes)}
+                className="h-5 w-5 rounded-full bg-gray-800 hover:bg-purple-600 p-0"
+              >
+                <ChevronRight className="h-2 w-2 rotate-[-90deg]" />
+              </Button>
+              <div className="bg-gray-800 rounded px-1 py-1 m-1 min-w-[2rem] text-center">
+                <span className="text-sm font-bold text-purple-400">{hours.padStart(2, '0')}</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleTimeChange(((parseInt(hours) - 1 + 24) % 24).toString(), minutes)}
+                className="h-5 w-5 rounded-full bg-gray-800 hover:bg-purple-600 p-0"
+              >
+                <ChevronRight className="h-2 w-2 rotate-90" />
+              </Button>
+            </div>
+            
+            <span className="text-sm font-bold text-gray-500">:</span>
+            
+            {/* Minutes */}
+            <div className="flex flex-col items-center">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleTimeChange(hours, ((parseInt(minutes) + 5) % 60).toString())}
+                className="h-5 w-5 rounded-full bg-gray-800 hover:bg-purple-600 p-0"
+              >
+                <ChevronRight className="h-2 w-2 rotate-[-90deg]" />
+              </Button>
+              <div className="bg-gray-800 rounded px-1 py-1 m-1 min-w-[2rem] text-center">
+                <span className="text-sm font-bold text-blue-400">{minutes.padStart(2, '0')}</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleTimeChange(hours, ((parseInt(minutes) - 5 + 60) % 60).toString())}
+                className="h-5 w-5 rounded-full bg-gray-800 hover:bg-purple-600 p-0"
+              >
+                <ChevronRight className="h-2 w-2 rotate-90" />
+              </Button>
+            </div>
+          </div>
+          
+          <div className="flex justify-center mt-2">
+            <Button
+              size="sm"
+              onClick={() => setShowPicker(false)}
+              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 h-6 text-xs px-3"
+            >
+              Done
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const UploadMedia = () => {
   const [mediaFiles, setMediaFiles] = useState<any[]>([]);
@@ -686,78 +898,84 @@ const UploadMedia = () => {
         </Card>
       </div>
 
-      {/* Schedule Dialog */}
+      {/* Modern Schedule Dialog */}
       <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Schedule Your Post</DialogTitle>
+        <DialogContent className="sm:max-w-lg max-w-[90vw] max-h-[95vh] bg-gray-800 border border-gray-700 overflow-hidden">
+          <DialogHeader className="bg-gradient-to-r from-purple-800/30 to-blue-800/30 -m-6 mb-3 p-3 rounded-t-lg">
+            <DialogTitle className="text-lg font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent flex items-center gap-2">
+              <CalendarIcon className="h-4 w-4 text-purple-400" />
+              Schedule Your Post
+            </DialogTitle>
+          
           </DialogHeader>
-          <div className="flex flex-col items-center gap-6 py-4">
-            <div className="flex flex-col items-center gap-2">
-              <Label style={{ color: '#fff' }}>Date</Label>
-              <div style={{ background: '#181818', borderRadius: '1rem', padding: '1rem', border: '2px solid #222' }}>
-                <Calendar
-                  value={scheduledDate}
-                  onChange={value => {
-                    if (value instanceof Date) setScheduledDate(value);
-                    else if (Array.isArray(value) && value[0] instanceof Date) setScheduledDate(value[0]);
-                  }}
-                  className="rounded-lg border shadow-md w-full"
-                  calendarType="gregory"
-                />
-                <style>{`
-                  .react-calendar {
-                    background: #181818 !important;
-                    color: #fff !important;
-                    border-radius: 1rem !important;
-                    border: 2px solid #222 !important;
-                  }
-                  .react-calendar__tile {
-                    background: #181818 !important;
-                    color: #fff !important;
-                    border-radius: 50% !important;
-                  }
-                  .react-calendar__tile--active, .react-calendar__tile--now {
-                    background: #222 !important;
-                    color: #fff !important;
-                  }
-                  .react-calendar__navigation {
-                    background: #181818 !important;
-                    color: #fff !important;
-                  }
-                  .react-calendar__month-view__weekdays {
-                    color: #fff !important;
-                  }
-                  .react-calendar__tile:disabled {
-                    background: #222 !important;
-                    color: #888 !important;
-                  }
-                `}</style>
+          
+          <div className="space-y-3 px-1">
+            {/* Date Selection */}
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold text-gray-200 flex items-center gap-1">
+                <CalendarIcon className="h-3 w-3 text-purple-400" />
+                Select Date
+              </Label>
+              <ModernCalendar 
+                value={scheduledDate} 
+                onChange={setScheduledDate} 
+              />
+            </div>
+            
+            {/* Time Selection */}
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold text-gray-200 flex items-center gap-1">
+                <Clock className="h-3 w-3 text-blue-400" />
+                Select Time
+              </Label>
+              <ModernTimePicker 
+                value={scheduledTime} 
+                onChange={setScheduledTime} 
+              />
+            </div>
+            
+            {/* Selected DateTime Display */}
+            <div className="bg-gradient-to-r from-purple-800/20 to-blue-800/20 border border-purple-600/30 rounded-lg p-2">
+              <div className="text-center">
+                <p className="text-xs text-gray-400">Scheduled for:</p>
+                <p className="text-sm font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+                  {format(scheduledDate, 'MMM do, yyyy')} at {(() => {
+                    const [h, m] = scheduledTime.split(':');
+                    const hour12 = parseInt(h) % 12 || 12;
+                    const period = parseInt(h) >= 12 ? 'PM' : 'AM';
+                    return `${hour12}:${m} ${period}`;
+                  })()}
+                </p>
               </div>
             </div>
-            <div className="flex flex-col items-center gap-2">
-              <Label style={{ color: '#fff' }}>Time</Label>
-              <div style={{ width: '200px', position: 'relative' }}>
-                <input
-                  type="time"
-                  value={scheduledTime}
-                  onChange={e => setScheduledTime(e.target.value)}
-                  style={{ background: '#222', color: '#fff', border: '2px solid #444', fontWeight: 600, fontSize: '1.3em', textAlign: 'center', borderRadius: '0.5em', width: '100%', padding: '0.4em 2.5em 0.4em 0.4em' }}
-                />
-                <style>{`
-                  input[type="time"]::-webkit-calendar-picker-indicator {
-                    filter: invert(1) brightness(2);
-                  }
-                  input[type="time"]::-ms-input-placeholder {
-                    color: #fff;
-                  }
-                  input[type="time"]::placeholder {
-                    color: #fff;
-                  }
-                `}</style>
-              </div>
+            
+            {/* Action Buttons */}
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowScheduleDialog(false)}
+                className="flex-1 bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600 h-9 text-sm"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSchedulePost} 
+                disabled={isPosting}
+                className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold h-9 text-sm"
+              >
+                {isPosting ? (
+                  <>
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    Scheduling...
+                  </>
+                ) : (
+                  <>
+                    <CalendarIcon className="h-3 w-3 mr-1" />
+                    Schedule Post
+                  </>
+                )}
+              </Button>
             </div>
-            <Button onClick={handleSchedulePost} className="w-full">Schedule</Button>
           </div>
         </DialogContent>
       </Dialog>

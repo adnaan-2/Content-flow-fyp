@@ -1,13 +1,6 @@
-import { useEffect, useState } from "react";
-import { Calendar as CalendarIcon, Clock, Filter, Plus } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import React, { useEffect, useState } from "react";
+import { Calendar as CalendarIcon, Clock, Filter, Edit, Trash2, X, Upload, Facebook, Instagram, Twitter, Linkedin, Image, Wand2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,380 +10,1009 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuCheckboxItem,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
-import { format } from "date-fns";
-import { useToast } from "@/components/ui/use-toast";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
+import { format, isSameDay } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 import axios from "axios";
+import { mediaService, adService } from "@/services/api";
 
-// Platform icons (simplified for this example)
-const platformIcons = {
-  facebook: "fab fa-facebook",
-  instagram: "fab fa-instagram",
-  twitter: "fab fa-twitter",
-  linkedin: "fab fa-linkedin",
-};
-
-const platformColors = {
-  facebook: "bg-blue-100 text-blue-800",
-  instagram: "bg-pink-100 text-pink-800",
-  twitter: "bg-sky-100 text-sky-800",
-  linkedin: "bg-blue-100 text-blue-800",
+// Platform configurations using your brand theme
+const platformConfig = {
+  facebook: {
+    name: "Facebook",
+    icon: Facebook,
+    color: "bg-blue-600",
+    lightColor: "bg-blue-50 text-blue-600 border-blue-600/20",
+  },
+  instagram: {
+    name: "Instagram", 
+    icon: Instagram,
+    color: "bg-pink-600",
+    lightColor: "bg-pink-50 text-pink-600 border-pink-600/20",
+  },
+  x: {
+    name: "X (Twitter)",
+    icon: Twitter,
+    color: "bg-gray-900",
+    lightColor: "bg-gray-50 text-gray-900 border-gray-200",
+  },
+  linkedin: {
+    name: "LinkedIn",
+    icon: Linkedin,
+    color: "bg-blue-700",
+    lightColor: "bg-blue-50 text-blue-700 border-blue-700/20",
+  },
 };
 
 interface ScheduledPost {
-  id: string;
-  content: string;
-  date: Date;
-  platform: string;
-  media?: string;
+  _id: string;
+  caption: string;
+  mediaUrl?: string;
+  mediaType: 'photo' | 'video';
+  platforms: string[];
+  scheduledTime: string;
+  status: 'pending' | 'posted' | 'failed';
+  facebookPageId?: string;
+  createdAt: string;
 }
 
-const SchedulePosts = () => {
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+interface EditPostData {
+  caption: string;
+  mediaUrl?: string;
+  platforms: string[];
+  scheduledTime: Date;
+}
+
+interface MediaItem {
+  _id: string;
+  url: string;
+  originalname: string;
+  mimetype: string;
+  size: number;
+  createdAt: string;
+}
+
+interface GeneratedAd {
+  _id: string;
+  url: string;
+  prompt: string;
+  style: string;
+  dimensions: {
+    width: number;
+    height: number;
+  };
+  createdAt: string;
+}
+
+export default function SchedulePost() {
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [currentViewDate, setCurrentViewDate] = useState<Date>(new Date());
   const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedPlatform, setSelectedPlatform] = useState("all");
-  const [newPost, setNewPost] = useState({
-    content: "",
-    platform: "",
-    date: new Date(),
-    time: "12:00",
-    media: "",
+  const [loading, setLoading] = useState(true);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingPost, setEditingPost] = useState<ScheduledPost | null>(null);
+  const [editData, setEditData] = useState<EditPostData>({
+    caption: '',
+    platforms: [],
+    scheduledTime: new Date(),
   });
+  const [selectedPlatformFilter, setSelectedPlatformFilter] = useState<string[]>([]);
+  const [dateRangeFilter, setDateRangeFilter] = useState<{start?: Date, end?: Date}>({});
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
+  const [showMediaGallery, setShowMediaGallery] = useState(false);
+  const [uploadedMedia, setUploadedMedia] = useState<MediaItem[]>([]);
+  const [generatedAds, setGeneratedAds] = useState<GeneratedAd[]>([]);
+  const [loadingMedia, setLoadingMedia] = useState(false);
+  const [loadingAds, setLoadingAds] = useState(false);
+  
   const { toast } = useToast();
 
-  // Dummy data for demonstration
-  useEffect(() => {
-    // This would be replaced with an API call to fetch posts
-    const dummyPosts: ScheduledPost[] = [
-      {
-        id: "1",
-        content: "Check out our new product launch!",
-        date: new Date(2023, 8, 15, 10, 0),
-        platform: "facebook",
-      },
-      {
-        id: "2",
-        content: "Join our webinar on digital marketing",
-        date: new Date(2023, 8, 17, 14, 30),
-        platform: "instagram",
-      },
-      {
-        id: "3",
-        content: "New blog post: 10 tips for content creation",
-        date: new Date(2023, 8, 20, 9, 0),
-        platform: "twitter",
-      },
-      {
-        id: "4",
-        content: "We're hiring! Join our team",
-        date: new Date(2023, 8, 22, 11, 0),
-        platform: "linkedin",
-      },
-    ];
-    setScheduledPosts(dummyPosts);
-  }, []);
-
-  // Get posts for selected date
-  const getPostsForSelectedDate = () => {
-    if (!selectedDate) return [];
-    
-    let filteredPosts = scheduledPosts.filter(post => 
-      post.date.getDate() === selectedDate.getDate() &&
-      post.date.getMonth() === selectedDate.getMonth() &&
-      post.date.getFullYear() === selectedDate.getFullYear()
-    );
-    
-    // Apply platform filter if not "all"
-    if (selectedPlatform !== "all") {
-      filteredPosts = filteredPosts.filter(post => post.platform === selectedPlatform);
-    }
-    
-    return filteredPosts;
-  };
-
-  // Handle scheduling a new post
-  const handleSchedulePost = async () => {
-    // Combine date and time
-    const [hours, minutes] = newPost.time.split(':').map(Number);
-    const scheduledDateTime = new Date(newPost.date);
-    scheduledDateTime.setHours(hours, minutes);
-    
-    const post: ScheduledPost = {
-      id: Date.now().toString(), // In real app, this would come from backend
-      content: newPost.content,
-      date: scheduledDateTime,
-      platform: newPost.platform,
-      media: newPost.media || undefined,
-    };
-    
-    // In a real app, this would be an API call
+  // Fetch scheduled posts
+  const fetchScheduledPosts = async () => {
     try {
-      // const response = await axios.post('/api/schedule', post);
-      // Add the new post to the list
-      setScheduledPosts([...scheduledPosts, post]);
-      
-      toast({
-        title: "Post scheduled",
-        description: `Your post has been scheduled for ${format(scheduledDateTime, 'PPp')}`,
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/api/schedule/all', {
+        headers: { Authorization: `Bearer ${token}` }
       });
-      
-      // Reset form and close dialog
-      setNewPost({
-        content: "",
-        platform: "",
-        date: new Date(),
-        time: "12:00",
-        media: "",
-      });
-      setIsDialogOpen(false);
-    } catch (error) {
+      setScheduledPosts(response.data.scheduledPosts || []);
+    } catch (error: any) {
+      console.error('Error fetching scheduled posts:', error);
       toast({
         title: "Error",
-        description: "Failed to schedule post",
+        description: "Failed to load scheduled posts",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch uploaded media
+  const fetchUploadedMedia = async () => {
+    try {
+      setLoadingMedia(true);
+      const response = await mediaService.getAllMedia();
+      setUploadedMedia(response.data.media || []);
+    } catch (error: any) {
+      console.error('Error fetching uploaded media:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load uploaded media",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingMedia(false);
+    }
+  };
+
+  // Fetch generated ads
+  const fetchGeneratedAds = async () => {
+    try {
+      setLoadingAds(true);
+      const response = await adService.getMyAds(1, 50); // Get up to 50 ads
+      setGeneratedAds(response.data.ads || []);
+    } catch (error: any) {
+      console.error('Error fetching generated ads:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load generated ads",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingAds(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchScheduledPosts();
+  }, []);
+
+  // Filter posts based on selected filters
+  const filteredPosts = scheduledPosts.filter(post => {
+    // Platform filter
+    if (selectedPlatformFilter.length > 0) {
+      const hasMatchingPlatform = post.platforms.some(platform => 
+        selectedPlatformFilter.includes(platform)
+      );
+      if (!hasMatchingPlatform) return false;
+    }
+
+    // Date range filter
+    const postDate = new Date(post.scheduledTime);
+    if (dateRangeFilter.start && postDate < dateRangeFilter.start) return false;
+    if (dateRangeFilter.end && postDate > dateRangeFilter.end) return false;
+
+    return true;
+  });
+
+  // Get posts for a specific date
+  const getPostsForDate = (date: Date) => {
+    return filteredPosts.filter(post => 
+      isSameDay(new Date(post.scheduledTime), date)
+    );
+  };
+
+  // Get unique platforms from posts for filter
+  const uniquePlatforms = Array.from(
+    new Set(scheduledPosts.flatMap(post => post.platforms))
+  );
+
+  // Delete scheduled post
+  const handleDeletePost = async (postId: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(`/api/schedule/${postId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      toast({
+        title: "Success",
+        description: "Scheduled post deleted successfully",
+      });
+      
+      fetchScheduledPosts();
+    } catch (error: any) {
+      console.error('Error deleting post:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete scheduled post",
         variant: "destructive",
       });
     }
   };
 
-  // Get dates with posts for highlighting in calendar
-  const getDatesWithPosts = () => {
-    let dates: Date[] = [];
-    let filteredPosts = scheduledPosts;
-    
-    if (selectedPlatform !== "all") {
-      filteredPosts = scheduledPosts.filter(post => post.platform === selectedPlatform);
-    }
-    
-    filteredPosts.forEach(post => {
-      dates.push(post.date);
+  // Open edit dialog
+  const handleEditPost = (post: ScheduledPost) => {
+    setEditingPost(post);
+    setEditData({
+      caption: post.caption,
+      mediaUrl: post.mediaUrl,
+      platforms: post.platforms,
+      scheduledTime: new Date(post.scheduledTime),
     });
-    
-    return dates;
+    setIsEditDialogOpen(true);
+    // Fetch media when opening edit dialog
+    fetchUploadedMedia();
+    fetchGeneratedAds();
   };
 
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Schedule Posts</h1>
-          <p className="text-muted-foreground">
-            Plan and schedule your content across platforms
-          </p>
+  // Handle media selection from gallery
+  const handleMediaSelect = (mediaUrl: string) => {
+    setEditData(prev => ({
+      ...prev,
+      mediaUrl: mediaUrl
+    }));
+    setShowMediaGallery(false);
+    toast({
+      title: "Success",
+      description: "Media selected successfully",
+    });
+  };
+
+  // Update scheduled post
+  const handleUpdatePost = async () => {
+    if (!editingPost) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      const updatePayload = {
+        caption: editData.caption,
+        mediaUrls: editData.mediaUrl ? [editData.mediaUrl] : [],
+        platforms: editData.platforms,
+        scheduledTime: editData.scheduledTime.toISOString(),
+      };
+
+      await axios.put(`/api/schedule/${editingPost._id}`, updatePayload, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      toast({
+        title: "Success",
+        description: "Scheduled post updated successfully",
+      });
+
+      setIsEditDialogOpen(false);
+      setEditingPost(null);
+      fetchScheduledPosts();
+    } catch (error: any) {
+      console.error('Error updating post:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update scheduled post",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle media upload
+  const handleMediaUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploadingMedia(true);
+      const formData = new FormData();
+      formData.append('media', file);
+
+      const token = localStorage.getItem('token');
+      const response = await axios.post('/api/media/upload', formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      setEditData(prev => ({
+        ...prev,
+        mediaUrl: response.data.url
+      }));
+
+      toast({
+        title: "Success",
+        description: "Media uploaded successfully",
+      });
+    } catch (error: any) {
+      console.error('Error uploading media:', error);
+      toast({
+        title: "Error",
+        description: "Failed to upload media",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingMedia(false);
+    }
+  };
+
+  // Custom day renderer for calendar with platform indicators
+  const renderCalendarDay = ({ date, ...props }: any) => {
+    const postsForDay = getPostsForDate(date);
+    const hasScheduledPosts = postsForDay.length > 0;
+    const platformsForDay = Array.from(new Set(postsForDay.flatMap(post => post.platforms)));
+    
+    return (
+      <div className="relative w-full h-full p-1">
+        <div className={cn(
+          "w-full h-full flex items-center justify-center rounded-md transition-colors cursor-pointer",
+          hasScheduledPosts && "bg-gradient-to-br from-blue-100 to-purple-100 font-semibold text-blue-900 border border-blue-200"
+        )}>
+          {date.getDate()}
         </div>
-        <Button onClick={() => setIsDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" /> Schedule Post
-        </Button>
-      </div>
-      
-      <div className="grid gap-4 lg:grid-cols-3">
-        {/* Calendar and Filters */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle>Calendar</CardTitle>
-            <CardDescription>Select a date to view scheduled posts</CardDescription>
-            
-            <div className="mt-2">
-              <Label htmlFor="platform-filter">Filter by platform</Label>
-              <Select 
-                value={selectedPlatform} 
-                onValueChange={setSelectedPlatform}
-              >
-                <SelectTrigger id="platform-filter" className="mt-1">
-                  <SelectValue placeholder="All platforms" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All platforms</SelectItem>
-                  <SelectItem value="facebook">Facebook</SelectItem>
-                  <SelectItem value="instagram">Instagram</SelectItem>
-                  <SelectItem value="twitter">Twitter</SelectItem>
-                  <SelectItem value="linkedin">LinkedIn</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={setSelectedDate}
-              className="rounded-md border"
-              modifiers={{
-                booked: getDatesWithPosts(),
-              }}
-              modifiersStyles={{
-                booked: { fontWeight: 'bold', textDecoration: 'underline' },
-              }}
-            />
-          </CardContent>
-        </Card>
-        
-        {/* Posts for selected date */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>
-              Posts for {selectedDate ? format(selectedDate, 'MMMM d, yyyy') : 'Selected Date'}
-            </CardTitle>
-            <CardDescription>
-              {getPostsForSelectedDate().length} posts scheduled
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {getPostsForSelectedDate().length > 0 ? (
-              <div className="space-y-4">
-                {getPostsForSelectedDate().map((post) => (
-                  <Card key={post.id} className="overflow-hidden">
-                    <CardHeader className="p-4 pb-0">
-                      <div className="flex justify-between items-center">
-                        <Badge className={platformColors[post.platform as keyof typeof platformColors]}>
-                          <i className={platformIcons[post.platform as keyof typeof platformIcons] + " mr-1"}></i>
-                          {post.platform.charAt(0).toUpperCase() + post.platform.slice(1)}
-                        </Badge>
-                        <span className="text-sm text-gray-500">
-                          {format(post.date, 'h:mm a')}
-                        </span>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-4">
-                      <p>{post.content}</p>
-                      {post.media && (
-                        <img  
-                          src={post.media} 
-                          alt="Post media" 
-                          className="mt-2 rounded-md max-h-40 object-cover" 
-                        />
-                      )}
-                    </CardContent>
-                    <CardFooter className="p-4 pt-0 flex justify-end space-x-2">
-                      <Button variant="outline" size="sm">Edit</Button>
-                      <Button variant="destructive" size="sm">Delete</Button>
-                    </CardFooter>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <CalendarIcon className="h-16 w-16 text-muted-foreground mb-4" />
-                <p>No posts scheduled for this date.</p>
-                <Button 
-                  variant="outline" 
-                  className="mt-4"
-                  onClick={() => setIsDialogOpen(true)}
-                >
-                  <Plus className="mr-2 h-4 w-4" /> Schedule Post
-                </Button>
-              </div>
+        {hasScheduledPosts && (
+          <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 flex gap-0.5">
+            {platformsForDay.slice(0, 4).map(platform => (
+              <div
+                key={platform}
+                className={cn(
+                  "w-1.5 h-1.5 rounded-full",
+                  platformConfig[platform as keyof typeof platformConfig]?.color || "bg-gray-400"
+                )}
+                title={platformConfig[platform as keyof typeof platformConfig]?.name}
+              />
+            ))}
+            {platformsForDay.length > 4 && (
+              <div className="w-1.5 h-1.5 rounded-full bg-gray-400" title={`+${platformsForDay.length - 4} more`} />
             )}
-          </CardContent>
-        </Card>
+          </div>
+        )}
       </div>
-      
-      {/* Schedule Post Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Schedule New Post</DialogTitle>
-            <DialogDescription>
-              Create a new post and schedule it for publishing.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="platform">Platform</Label>
-              <Select 
-                value={newPost.platform} 
-                onValueChange={(value) => setNewPost({...newPost, platform: value})}
+    );
+  };
+
+  // Custom calendar component with large date boxes
+  const CustomCalendar = () => {
+    const today = new Date();
+    const currentMonth = currentViewDate.getMonth();
+    const currentYear = currentViewDate.getFullYear();
+    
+    // Get first day of month and number of days
+    const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
+    const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0);
+    const daysInMonth = lastDayOfMonth.getDate();
+    const startingDayOfWeek = firstDayOfMonth.getDay();
+    
+    // Generate calendar days
+    const calendarDays = [];
+    
+    // Add empty cells for days before month starts
+    for (let i = 0; i < startingDayOfWeek; i++) {
+      calendarDays.push(null);
+    }
+    
+    // Add days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      calendarDays.push(new Date(currentYear, currentMonth, day));
+    }
+    
+    const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'];
+    
+    const goToPreviousMonth = () => {
+      setCurrentViewDate(new Date(currentYear, currentMonth - 1, 1));
+      setSelectedDate(null);
+      setShowSidebar(false);
+    };
+    
+    const goToNextMonth = () => {
+      setCurrentViewDate(new Date(currentYear, currentMonth + 1, 1));
+      setSelectedDate(null);
+      setShowSidebar(false);
+    };
+    
+    return (
+      <div className="w-full h-full">
+        {/* Calendar Header */}
+        <div className="flex items-center justify-between mb-6 bg-black border border-gray-800 rounded-xl p-6 shadow-xl">
+          <div className="flex items-center gap-4">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+              {monthNames[currentMonth]} {currentYear}
+            </h1>
+            <div className="flex gap-3">
+              <Button 
+                variant="outline" 
+                size="lg" 
+                onClick={goToPreviousMonth}
+                className="border border-purple-500 text-purple-400 hover:bg-purple-500 hover:text-white font-bold px-6 bg-gray-700"
               >
-                <SelectTrigger id="platform">
-                  <SelectValue placeholder="Select platform" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="facebook">Facebook</SelectItem>
-                  <SelectItem value="instagram">Instagram</SelectItem>
-                  <SelectItem value="twitter">Twitter</SelectItem>
-                  <SelectItem value="linkedin">LinkedIn</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="grid gap-2">
-              <Label htmlFor="content">Content</Label>
-              <Textarea
-                id="content"
-                placeholder="Write your post content..."
-                value={newPost.content}
-                onChange={(e) => setNewPost({...newPost, content: e.target.value})}
-              />
-            </div>
-            
-            <div className="grid gap-2">
-              <Label htmlFor="media">Media URL (optional)</Label>
-              <Input
-                id="media"
-                type="text"
-                placeholder="Enter media URL"
-                value={newPost.media}
-                onChange={(e) => setNewPost({...newPost, media: e.target.value})}
-              />
-            </div>
-            
-            <div className="grid gap-2">
-              <Label>Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !newPost.date && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {newPost.date ? format(newPost.date, "PPP") : "Pick a date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={newPost.date}
-                    onSelect={(date) => date && setNewPost({...newPost, date})}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-            
-            <div className="grid gap-2">
-              <Label htmlFor="time">Time</Label>
-              <div className="flex items-center">
-                <Clock className="mr-2 h-4 w-4 text-gray-400" />
-                <Input
-                  id="time"
-                  type="time"
-                  value={newPost.time}
-                  onChange={(e) => setNewPost({...newPost, time: e.target.value})}
-                  className="flex-1"
-                />
-              </div>
+                ← Prev
+              </Button>
+              <Button 
+                variant="outline" 
+                size="lg" 
+                onClick={goToNextMonth}
+                className="border border-purple-500 text-purple-400 hover:bg-purple-500 hover:text-white font-bold px-6 bg-gray-700"
+              >
+                Next →
+              </Button>
             </div>
           </div>
           
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-            <Button type="button" onClick={handleSchedulePost}>Schedule Post</Button>
+          {/* Filter Controls */}
+          <div className="flex gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2 bg-gray-700 border border-gray-600 hover:bg-purple-500 hover:text-white hover:border-purple-500 font-semibold text-gray-200">
+                  <Filter className="h-5 w-5" />
+                  Platforms
+                  {selectedPlatformFilter.length > 0 && (
+                    <Badge className="ml-1 bg-orange-500 text-white">
+                      {selectedPlatformFilter.length}
+                    </Badge>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56">
+                <DropdownMenuLabel>Filter by Platform</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {uniquePlatforms.map(platform => {
+                  const config = platformConfig[platform as keyof typeof platformConfig];
+                  const IconComponent = config?.icon;
+                  return (
+                    <DropdownMenuCheckboxItem
+                      key={platform}
+                      checked={selectedPlatformFilter.includes(platform)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedPlatformFilter(prev => [...prev, platform]);
+                        } else {
+                          setSelectedPlatformFilter(prev => prev.filter(p => p !== platform));
+                        }
+                      }}
+                    >
+                      <span className="mr-2">
+                        {IconComponent && <IconComponent className="h-4 w-4" />}
+                      </span>
+                      {config?.name || platform}
+                    </DropdownMenuCheckboxItem>
+                  );
+                })}
+                {selectedPlatformFilter.length > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setSelectedPlatformFilter([])}>
+                      Clear filters
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+        
+        {/* Weekday Headers */}
+        <div className="grid grid-cols-7 gap-3 mb-4">
+          {weekdays.map(day => (
+            <div key={day} className="text-center font-bold text-white py-4 bg-black rounded-xl border border-gray-800">
+              {day}
+            </div>
+          ))}
+        </div>
+        
+        {/* Calendar Grid */}
+        <div className="grid grid-cols-7 gap-3 h-[calc(100vh-200px)]">
+          {calendarDays.map((date, index) => {
+            if (!date) {
+              return <div key={index} className="bg-black border border-gray-800 rounded-xl"></div>;
+            }
+            
+            const postsForDay = getPostsForDate(date);
+            const hasScheduledPosts = postsForDay.length > 0;
+            const platformsForDay = Array.from(new Set(postsForDay.flatMap(post => post.platforms)));
+            const isToday = isSameDay(date, today);
+            const isSelected = selectedDate && isSameDay(date, selectedDate);
+            
+            const handleDateClick = () => {
+              if (hasScheduledPosts) {
+                setSelectedDate(date);
+                setShowSidebar(true);
+              } else {
+                setSelectedDate(null);
+                setShowSidebar(false);
+              }
+            };
+            
+            return (
+              <div
+                key={index}
+                className={cn(
+                  "bg-black border border-gray-800 rounded-xl p-3 transition-all duration-300 flex flex-col shadow-lg min-h-[140px]",
+                  hasScheduledPosts ? "cursor-pointer hover:shadow-xl hover:border-purple-400 hover:-translate-y-1 hover:bg-gray-900" : "cursor-default",
+                  isToday && "bg-gradient-to-br from-blue-900/50 to-purple-900/50 border-blue-400 ring-2 ring-blue-400/40",
+                  hasScheduledPosts && "bg-gradient-to-br from-purple-900/50 via-pink-900/50 to-blue-900/50 border-purple-400 shadow-xl",
+                  isSelected && "ring-2 ring-purple-400 shadow-2xl transform scale-105 bg-purple-900/30"
+                )}
+                onClick={handleDateClick}
+              >
+                {/* Date Number */}
+                <div className={cn(
+                  "text-2xl font-bold mb-2 leading-none",
+                  !hasScheduledPosts && !isToday && "text-gray-300",
+                  isToday && "text-blue-400",
+                  hasScheduledPosts && "text-purple-400"
+                )}>
+                  {date.getDate()}
+                </div>
+                
+                {/* Content area with proper spacing */}
+                {hasScheduledPosts ? (
+                  <div className="flex flex-col gap-2 mt-auto">
+                    {/* Platform Icons */}
+                    <div className="flex flex-wrap gap-1.5">
+                      {platformsForDay.slice(0, 4).map(platform => {
+                        const config = platformConfig[platform as keyof typeof platformConfig];
+                        const IconComponent = config?.icon;
+                        return (
+                          <div
+                            key={platform}
+                            className={cn(
+                              "w-6 h-6 rounded-full flex items-center justify-center text-white shadow-sm border border-gray-500",
+                              config?.color || "bg-gray-400"
+                            )}
+                            title={config?.name}
+                          >
+                            {IconComponent && <IconComponent className="h-3 w-3" />}
+                          </div>
+                        );
+                      })}
+                      {platformsForDay.length > 4 && (
+                        <div className="w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center text-white text-xs font-bold shadow-sm border border-gray-500">
+                          +{platformsForDay.length - 4}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Post count indicator */}
+                    <div className="text-xs font-bold text-white bg-gradient-to-r from-purple-600 to-blue-600 rounded-full px-2 py-1 text-center shadow-md">
+                      {postsForDay.length} post{postsForDay.length > 1 ? 's' : ''}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-auto text-center">
+                    <div className="text-xs text-white-500 opacity-70">
+                      No posts scheduled
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="h-screen w-full p-6 bg-black">
+      <CustomCalendar />
+      
+      {/* Posts List Modal/Sidebar for Selected Date */}
+      {showSidebar && selectedDate && getPostsForDate(selectedDate).length > 0 && (
+        <Card className="fixed top-6 right-6 w-80 max-h-[calc(100vh-3rem)] overflow-y-auto shadow-2xl border border-gray-800 bg-black/95 backdrop-blur-md">
+          <CardHeader className="pb-3 bg-gradient-to-r from-purple-800/30 to-blue-800/30 rounded-t-lg relative">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setShowSidebar(false);
+                setSelectedDate(null);
+              }}
+              className="absolute top-2 right-2 h-8 w-8 p-0 text-gray-400 hover:text-white hover:bg-gray-700"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+            <CardTitle className="text-lg font-bold text-purple-400 pr-8">
+              {format(selectedDate, 'MMM dd, yyyy')}
+            </CardTitle>
+            <CardDescription className="text-purple-300">
+              {getPostsForDate(selectedDate).length} scheduled post{getPostsForDate(selectedDate).length > 1 ? 's' : ''}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {getPostsForDate(selectedDate).map(post => {
+              const isPosted = post.status === 'posted';
+              const isPending = post.status === 'pending';
+              const isFailed = post.status === 'failed';
+              
+              return (
+                <div
+                  key={post._id}
+                  className={cn(
+                    "border rounded-xl p-4 transition-all duration-200 group relative",
+                    isPosted && "bg-gradient-to-br from-green-800/20 to-emerald-800/20 border-green-600/50",
+                    isPending && "bg-gradient-to-br from-purple-800/20 to-blue-800/20 border-purple-600/50 hover:shadow-md",
+                    isFailed && "bg-gradient-to-br from-red-800/20 to-pink-800/20 border-red-600/50"
+                  )}
+                >
+                  {/* Status Badge */}
+                  <div className="absolute top-2 right-2">
+                    <Badge
+                      className={cn(
+                        "text-xs font-medium",
+                        isPosted && "bg-green-800/30 text-green-300 border-green-600/50",
+                        isPending && "bg-purple-800/30 text-purple-300 border-purple-600/50",
+                        isFailed && "bg-red-800/30 text-red-300 border-red-600/50"
+                      )}
+                    >
+                      {post.status.charAt(0).toUpperCase() + post.status.slice(1)}
+                    </Badge>
+                  </div>
+
+                  <div className="flex items-start justify-between mb-3 pr-16">
+                    <div className="flex-1">
+                      <p className="font-semibold text-sm text-gray-200 mb-1">
+                        {format(new Date(post.scheduledTime), 'h:mm a')}
+                      </p>
+                      <p className="text-gray-400 text-xs line-clamp-2">
+                        {post.caption}
+                      </p>
+                    </div>
+                  </div>
+
+                  {post.mediaUrl && (
+                    <div className="mb-3">
+                      <img src={post.mediaUrl} alt="Post media" className="w-full h-20 object-cover rounded-lg border border-gray-200" />
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    {post.platforms.map(platform => {
+                      const config = platformConfig[platform as keyof typeof platformConfig];
+                      const IconComponent = config?.icon;
+                      return (
+                        <Badge 
+                          key={platform} 
+                          className="text-xs font-medium border border-gray-600 bg-gray-700 text-gray-300"
+                        >
+                          <span className="mr-1">
+                            {IconComponent && <IconComponent className="h-3 w-3" />}
+                          </span>
+                          {config?.name}
+                        </Badge>
+                      );
+                    })}
+                  </div>
+
+                  {/* Action Buttons or Status Message */}
+                  {isPosted ? (
+                    <div className="pt-3 border-t border-green-600/50">
+                      <div className="text-center py-2">
+                        <p className="text-xs font-medium text-green-300">
+                          ✅ This post has been successfully published to all platforms
+                        </p>
+                      </div>
+                    </div>
+                  ) : isFailed ? (
+                    <div className="pt-3 border-t border-red-600/50">
+                      <div className="text-center py-2">
+                        <p className="text-xs font-medium text-red-300 mb-2">
+                          ❌ Failed to publish - you can edit and retry
+                        </p>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleEditPost(post)}
+                            className="flex-1 text-xs hover:bg-purple-500/20 hover:border-purple-400 bg-gray-700 border-gray-600 text-gray-300"
+                          >
+                            <Edit className="h-3 w-3 mr-1" />
+                            Edit & Retry
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDeletePost(post._id)}
+                            className="flex-1 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/20 bg-gray-700 border-gray-600"
+                          >
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="pt-3 border-t border-purple-600/50">
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleEditPost(post)}
+                          className="flex-1 text-xs hover:bg-purple-500/20 hover:border-purple-400 hover:text-purple-300 bg-gray-700 border-gray-600 text-gray-300"
+                        >
+                          <Edit className="h-3 w-3 mr-1" />
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDeletePost(post._id)}
+                          className="flex-1 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/20 bg-gray-700 border-gray-600"
+                        >
+                          <Trash2 className="h-3 w-3 mr-1" />
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Edit Post Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto bg-black border border-gray-800">
+          <DialogHeader className="bg-gradient-to-r from-purple-800/30 to-blue-800/30 -m-6 mb-4 p-6 rounded-t-lg">
+            <DialogTitle className="text-xl font-bold text-purple-400">Edit Scheduled Post</DialogTitle>
+            <DialogDescription className="text-purple-300">
+              Make changes to your scheduled post. All changes will be saved immediately.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Caption */}
+            <div>
+              <Label htmlFor="edit-caption" className="text-gray-200">Caption</Label>
+              <Textarea
+                id="edit-caption"
+                value={editData.caption}
+                onChange={(e) => setEditData(prev => ({ ...prev, caption: e.target.value }))}
+                placeholder="What's on your mind?"
+                className="mt-1 bg-gray-700 border-gray-600 text-gray-200 placeholder:text-gray-400"
+                rows={3}
+              />
+            </div>
+
+            {/* Media Upload */}
+            <div>
+              <Label className="text-gray-200">Photo/Video</Label>
+              <div className="mt-2 space-y-3">
+                {editData.mediaUrl && (
+                  <div className="relative">
+                    <img
+                      src={editData.mediaUrl}
+                      alt="Post media"
+                      className="w-full h-32 object-cover rounded border border-gray-600"
+                    />
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setEditData(prev => ({ ...prev, mediaUrl: undefined }))}
+                      className="absolute top-2 right-2 bg-gray-700 hover:bg-gray-600"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-2 gap-2">
+                  {/* Upload New Media */}
+                  <div>
+                    <Input
+                      type="file"
+                      accept="image/*,video/*"
+                      onChange={handleMediaUpload}
+                      disabled={uploadingMedia}
+                      className="hidden"
+                      id="media-upload"
+                    />
+                    <Label htmlFor="media-upload" className="cursor-pointer">
+                      <div className="border-2 border-dashed border-purple-500/50 rounded-xl p-4 text-center hover:border-purple-400 hover:bg-purple-500/10 transition-all duration-200">
+                        {uploadingMedia ? (
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-400 mx-auto mb-1"></div>
+                        ) : (
+                          <Upload className="h-5 w-5 text-purple-400 mx-auto mb-1" />
+                        )}
+                        <p className="text-xs text-purple-300 font-medium">
+                          {uploadingMedia ? 'Uploading...' : 'Upload New'}
+                        </p>
+                      </div>
+                    </Label>
+                  </div>
+
+                  {/* Select from Gallery */}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowMediaGallery(!showMediaGallery)}
+                    className="h-full border-2 border-dashed border-blue-500/50 rounded-xl p-4 text-center hover:border-blue-400 hover:bg-blue-500/10 transition-all duration-200 bg-transparent"
+                  >
+                    <div className="flex flex-col items-center">
+                      <Image className="h-5 w-5 text-blue-400 mb-1" />
+                      <p className="text-xs text-blue-300 font-medium">
+                        Select Media
+                      </p>
+                    </div>
+                  </Button>
+                </div>
+
+                {/* Media Gallery */}
+                {showMediaGallery && (
+                  <div className="border border-gray-600 rounded-lg p-4 bg-gray-700/50">
+                    <Tabs defaultValue="uploaded" className="w-full">
+                      <TabsList className="grid w-full grid-cols-2 bg-gray-600">
+                        <TabsTrigger value="uploaded" className="data-[state=active]:bg-gray-800">
+                          <Image className="h-4 w-4 mr-2" />
+                          Uploaded Media
+                        </TabsTrigger>
+                        <TabsTrigger value="generated" className="data-[state=active]:bg-gray-800">
+                          <Wand2 className="h-4 w-4 mr-2" />
+                          Generated Ads
+                        </TabsTrigger>
+                      </TabsList>
+                      
+                      <TabsContent value="uploaded" className="mt-4">
+                        <ScrollArea className="h-48">
+                          {loadingMedia ? (
+                            <div className="flex items-center justify-center h-32">
+                              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-400"></div>
+                              <span className="ml-2 text-gray-400">Loading media...</span>
+                            </div>
+                          ) : uploadedMedia.length === 0 ? (
+                            <div className="text-center py-8 text-gray-400">
+                              <Image className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                              <p>No uploaded media found</p>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-3 gap-2">
+                              {uploadedMedia.map((media) => (
+                                <div
+                                  key={media._id}
+                                  className="relative cursor-pointer group"
+                                  onClick={() => handleMediaSelect(media.url)}
+                                >
+                                  <img
+                                    src={media.url}
+                                    alt={media.originalname}
+                                    className="w-full h-16 object-cover rounded border border-gray-600 group-hover:border-purple-400 transition-colors"
+                                  />
+                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 rounded transition-colors flex items-center justify-center">
+                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <div className="w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center">
+                                        <span className="text-white text-xs">✓</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </ScrollArea>
+                      </TabsContent>
+                      
+                      <TabsContent value="generated" className="mt-4">
+                        <ScrollArea className="h-48">
+                          {loadingAds ? (
+                            <div className="flex items-center justify-center h-32">
+                              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-400"></div>
+                              <span className="ml-2 text-gray-400">Loading ads...</span>
+                            </div>
+                          ) : generatedAds.length === 0 ? (
+                            <div className="text-center py-8 text-gray-400">
+                              <Wand2 className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                              <p>No generated ads found</p>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-3 gap-2">
+                              {generatedAds.map((ad) => (
+                                <div
+                                  key={ad._id}
+                                  className="relative cursor-pointer group"
+                                  onClick={() => handleMediaSelect(ad.url)}
+                                >
+                                  <img
+                                    src={ad.url}
+                                    alt={ad.prompt}
+                                    className="w-full h-16 object-cover rounded border border-gray-600 group-hover:border-blue-400 transition-colors"
+                                  />
+                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 rounded transition-colors flex items-center justify-center">
+                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                                        <span className="text-white text-xs">✓</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </ScrollArea>
+                      </TabsContent>
+                    </Tabs>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Platform Selection */}
+            <div>
+              <Label className="text-gray-200">Platforms</Label>
+              <div className="mt-2 space-y-2">
+                {Object.entries(platformConfig).map(([key, config]) => {
+                  const IconComponent = config.icon;
+                  return (
+                    <div key={key} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`platform-${key}`}
+                        checked={editData.platforms.includes(key)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setEditData(prev => ({
+                              ...prev,
+                              platforms: [...prev.platforms, key]
+                            }));
+                          } else {
+                            setEditData(prev => ({
+                              ...prev,
+                              platforms: prev.platforms.filter(p => p !== key)
+                            }));
+                          }
+                        }}
+                        className="border-gray-600 data-[state=checked]:bg-purple-500 data-[state=checked]:border-purple-500"
+                      />
+                      <Label htmlFor={`platform-${key}`} className="flex items-center gap-2 cursor-pointer text-gray-200">
+                        <IconComponent className="h-4 w-4" />
+                        {config.name}
+                      </Label>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Date and Time */}
+            <div>
+              <Label htmlFor="edit-datetime" className="text-gray-200">Scheduled Date & Time</Label>
+              <Input
+                id="edit-datetime"
+                type="datetime-local"
+                value={format(editData.scheduledTime, "yyyy-MM-dd'T'HH:mm")}
+                onChange={(e) => setEditData(prev => ({
+                  ...prev,
+                  scheduledTime: new Date(e.target.value)
+                }))}
+                className="mt-1 bg-gray-700 border-gray-600 text-gray-200"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="bg-gradient-to-r from-purple-800/20 to-blue-800/20 -m-6 mt-4 p-6 rounded-b-lg">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsEditDialogOpen(false)}
+              className="hover:bg-gray-700 bg-gray-700 border-gray-600 text-gray-200"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleUpdatePost}
+              disabled={!editData.caption || editData.platforms.length === 0}
+              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-medium"
+            >
+              Update Post
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
   );
-};
-
-export default SchedulePosts;
+}

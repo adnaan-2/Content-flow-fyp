@@ -39,6 +39,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { adService } from "@/services/api";
+import TextType from "@/components/ui/text-type";
+import Plasma from "@/components/ui/Plasma";
 
 const GenerateAds = () => {
   const [prompt, setPrompt] = useState("");
@@ -286,396 +288,389 @@ const GenerateAds = () => {
   };
 
   return (
-    <div className="h-screen bg-background text-foreground overflow-hidden">
+    <div className="h-[85vh] bg-black text-gray-100 flex flex-col relative">
+      {/* Simple Dark Background */}
+      <div className="absolute inset-0 bg-black">
+        <div className="absolute top-0 left-0 w-full h-full overflow-hidden">
+          <div className="absolute top-20 left-20 w-48 h-48 bg-gray-800/20 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-20 right-20 w-64 h-64 bg-gray-700/15 rounded-full blur-3xl"></div>
+        </div>
+      </div>
+
       {/* Error/Success Messages */}
       {error && (
-        <Alert className="mx-auto max-w-4xl mx-4 my-2 bg-destructive/10 text-destructive border-destructive/20">
-          <AlertDescription className="flex items-center gap-2">
-            <span className="animate-bounce">⚠️</span>
+        <Alert className="mx-auto max-w-4xl mx-4 my-1 bg-red-900/30 text-red-300 border border-red-600/40 relative z-10 flex-shrink-0">
+          <AlertDescription className="flex items-center gap-2 text-sm">
+            <span>⚠️</span>
             {error}
           </AlertDescription>
         </Alert>
       )}
       
       {success && (
-        <Alert className="mx-auto max-w-4xl mx-4 my-2 bg-green-500/10 text-green-500 border-green-500/20">
-          <AlertDescription className="flex items-center gap-2">
-            <span className="animate-bounce">🎉</span>
+        <Alert className="mx-auto max-w-4xl mx-4 my-1 bg-green-900/30 text-green-300 border border-green-600/40 relative z-10 flex-shrink-0">
+          <AlertDescription className="flex items-center gap-2 text-sm">
+            <span>🎉</span>
             {success}
             {showHeartAnimation && (
-              <Heart className="h-4 w-4 text-red-400 animate-ping ml-2" />
+              <Heart className="h-4 w-4 text-pink-400 animate-ping ml-2" />
             )}
           </AlertDescription>
         </Alert>
       )}
 
       {/* Main Container - Full Height Layout */}
-      <div className="h-full flex flex-col px-4 py-4">
-        {/* Header Section - Compact */}
-        <div className="text-center mb-4">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <Sparkles className="h-8 w-8 text-primary" />
-            <h1 className="text-2xl font-bold text-foreground">AI Design Studio</h1>
-          </div>
-          <p className="text-sm text-muted-foreground">Transform your ideas into stunning ads with AI</p>
-        </div>
+      <div className="flex-1 flex relative z-10 min-h-0">
+        {/* Main Content Area - Center */}
+        <div className="flex-1 flex flex-col min-h-0">
+          {/* Header Section - Compact */}
+          
 
-        {/* Search Bar Section - Compact */}
-        <div className="w-full max-w-4xl mx-auto mb-4">
-          <div className="relative">
-            <Textarea
-              placeholder="Describe your dream ad in detail... Be creative and specific!"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              rows={1}
-              className="w-full min-h-[50px] bg-background border-2 border-border text-foreground placeholder-muted-foreground/70 resize-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200 text-base font-medium rounded-xl px-5 py-3 pr-16 shadow-lg hover:shadow-xl"
-              style={{ 
-                fontSize: '16px',
-                lineHeight: '1.4'
-              }}
-              onInput={(e) => {
-                const target = e.target as HTMLTextAreaElement;
-                target.style.height = 'auto';
-                target.style.height = Math.max(50, target.scrollHeight) + 'px';
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  if (!isGenerating && prompt.trim()) {
-                    handleGenerate();
-                  }
-                }
-              }}
-            />
-            <Button 
-              onClick={handleGenerate} 
-              disabled={isGenerating || !prompt.trim()}
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-4 py-2 h-auto shadow-md hover:shadow-lg transition-all duration-200"
-              size="sm"
-            >
-              {isGenerating ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Sparkles className="h-4 w-4" />
-              )}
-            </Button>
-          </div>
-
-          {/* Compact Selection Icons */}
-          <div className="flex justify-center items-center gap-4 mt-3">
-            {/* Category Selector */}
-            <div className="relative dropdown-container">
-              <Button
-                variant="outline"
-                size="sm"
-                className={`flex items-center gap-2 h-8 px-3 transition-all duration-200 ${
-                  selectedCategory 
-                    ? "bg-primary text-primary-foreground border-primary" 
-                    : "hover:bg-accent hover:text-accent-foreground"
-                }`}
-                onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-              >
-                {selectedCategory ? (
-                  <>
-                    {(() => {
-                      const category = categories.find(c => c.id === selectedCategory);
-                      const IconComponent = category?.icon || Palette;
-                      return <IconComponent className="h-3 w-3" />;
-                    })()}
-                    <span className="text-xs font-medium">
-                      {categories.find(c => c.id === selectedCategory)?.name.split(' ')[0]}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <Palette className="h-3 w-3" />
-                    <span className="text-xs">Category</span>
-                  </>
-                )}
-              </Button>
-              
-              {showCategoryDropdown && (
-                <div className="absolute top-10 left-0 bg-background border border-border rounded-lg shadow-xl p-2 z-50 min-w-[200px]">
-                  <div className="grid grid-cols-2 gap-1">
-                    {categories.map((category) => {
-                      const IconComponent = category.icon;
-                      return (
-                        <Button
-                          key={category.id}
-                          variant={selectedCategory === category.id ? "default" : "ghost"}
-                          size="sm"
-                          className="h-10 flex flex-col items-center gap-1 transition-all duration-200"
-                          onClick={() => {
-                            setSelectedCategory(category.id);
-                            setShowCategoryDropdown(false);
-                          }}
-                        >
-                          <IconComponent className="h-3 w-3" />
-                          <span className="text-xs">{category.name.split(' ')[0]}</span>
-                        </Button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Ratio Selector */}
-            <div className="relative dropdown-container">
-              <Button
-                variant="outline"
-                size="sm"
-                className={`flex items-center gap-2 h-8 px-3 transition-all duration-200 ${
-                  selectedSize 
-                    ? "bg-primary text-primary-foreground border-primary" 
-                    : "hover:bg-accent hover:text-accent-foreground"
-                }`}
-                onClick={() => setShowRatioDropdown(!showRatioDropdown)}
-              >
-                <div className={`border-2 ${selectedSize ? 'border-primary-foreground' : 'border-current'} rounded`} 
-                     style={{ 
-                       width: selectedSize ? 
-                         (sizes.find(s => s.id === selectedSize)?.ratio === '1:1' ? '10px' : 
-                          sizes.find(s => s.id === selectedSize)?.ratio.includes('16:9') ? '14px' : '8px') : '10px',
-                       height: selectedSize ? 
-                         (sizes.find(s => s.id === selectedSize)?.ratio === '1:1' ? '10px' : 
-                          sizes.find(s => s.id === selectedSize)?.ratio.includes('16:9') ? '8px' : '12px') : '10px'
-                     }}>
-                </div>
-                <span className="text-xs">
-                  {selectedSize ? sizes.find(s => s.id === selectedSize)?.ratio : "Ratio"}
-                </span>
-              </Button>
-              
-              {showRatioDropdown && (
-                <div className="absolute top-10 left-0 bg-background border border-border rounded-lg shadow-xl p-2 z-50 min-w-[140px]">
-                  <div className="space-y-1">
-                    {sizes.map((size) => (
-                      <Button
-                        key={size.id}
-                        variant={selectedSize === size.id ? "default" : "ghost"}
-                        size="sm"
-                        className="w-full flex items-center gap-2 justify-start h-8 transition-all duration-200"
-                        onClick={() => {
-                          setSelectedSize(size.id);
-                          setShowRatioDropdown(false);
-                        }}
-                      >
-                        <div className={`border-2 ${selectedSize === size.id ? 'border-primary-foreground' : 'border-current'} rounded`} 
-                             style={{ 
-                               width: size.ratio === '1:1' ? '10px' : size.ratio.includes('16:9') ? '14px' : '8px',
-                               height: size.ratio === '1:1' ? '10px' : size.ratio.includes('16:9') ? '8px' : '12px'
-                             }}>
-                        </div>
-                        <div className="text-left">
-                          <div className="text-xs font-medium">{size.name}</div>
-                        </div>
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Template Selector - Only show if category is selected */}
-            {selectedCategory && (
-              <div className="relative dropdown-container">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={`flex items-center gap-2 h-8 px-3 transition-all duration-200 ${
-                    selectedTemplate 
-                      ? "bg-primary text-primary-foreground border-primary" 
-                      : "hover:bg-accent hover:text-accent-foreground"
-                  }`}
-                  onClick={() => setShowTemplateDropdown(!showTemplateDropdown)}
-                >
-                  <Star className="h-3 w-3" />
-                  <span className="text-xs">
-                    {selectedTemplate ? 
-                      templates[selectedCategory]?.find(t => t.id === selectedTemplate)?.name : 
-                      "Template"
-                    }
-                  </span>
-                </Button>
-                
-                {showTemplateDropdown && (
-                  <div className="absolute top-10 left-0 bg-background border border-border rounded-lg shadow-xl p-2 z-50 min-w-[160px]">
-                    <div className="space-y-1">
-                      {templates[selectedCategory]?.map((template) => (
-                        <Button
-                          key={template.id}
-                          variant={selectedTemplate === template.id ? "default" : "ghost"}
-                          size="sm"
-                          className="w-full text-left justify-start h-7 transition-all duration-200"
-                          onClick={() => {
-                            handleTemplateSelect(template);
-                            setShowTemplateDropdown(false);
-                          }}
-                        >
-                          <span className="text-xs">{template.name}</span>
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+          {/* Generated Result Display - Center Area */}
+          <div className="flex-1 flex items-center justify-center px-4 py-2 min-h-0 relative">
+            {/* Plasma Background - Only show when no generated image */}
+            {!generatedImage && (
+              <div className="absolute inset-0 rounded-xl overflow-hidden">
+                <Plasma 
+                  color="#8b5cf6"
+                  speed={0.3}
+                  direction="pingpong"
+                  scale={1.2}
+                  opacity={0.3}
+                  mouseInteractive={true}
+                />
               </div>
             )}
-          </div>
-        </div>
-
-        {/* Main Content Area - Flexible Height */}
-        <div className="flex-1 flex gap-4 min-h-0">
-          {/* Generated Result Display - Left Side */}
-          <div className="flex-1 flex items-center justify-center">
+            
             {generatedImage ? (
-              <div className="w-full max-w-md">
-                <div className="bg-card border border-border rounded-lg p-4 shadow-lg">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-5 h-5 bg-primary rounded-full flex items-center justify-center">
-                      <Sparkles className="h-3 w-3 text-primary-foreground" />
-                    </div>
-                    <span className="text-xs font-semibold text-muted-foreground">AI Generated</span>
-                  </div>
-                  
-                  <div className="mb-4">
-                    <img
-                      src={generatedImage.imageUrl}
-                      alt="Generated Ad"
-                      className="w-full h-auto max-h-64 object-contain rounded-lg shadow-md border border-border mx-auto"
-                    />
-                  </div>
-                  
-                  <div className="flex gap-2 justify-center">
-                    <Button 
-                      onClick={handleDownload} 
-                      size="sm" 
-                      className="bg-green-600 hover:bg-green-700 text-white font-medium px-4"
-                    >
-                      <Download className="h-3 w-3 mr-2" />
-                      Download
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={handleGenerate}
-                      disabled={isGenerating}
-                      className="font-medium px-4"
-                    >
-                      <Sparkles className="h-3 w-3 mr-2" />
-                      Regenerate
-                    </Button>
-                  </div>
+              <div className="text-center w-full h-full flex flex-col items-center justify-center">
+                <div className="mb-6">
+                  <img
+                    src={generatedImage.imageUrl}
+                    alt="Generated Ad"
+                    className="max-w-md max-h-80 object-contain rounded-xl border border-gray-600 shadow-2xl"
+                  />
+                </div>
+                
+                <div className="flex gap-4 justify-center">
+                  <Button 
+                    onClick={handleDownload} 
+                    className="bg-gradient-to-r from-primary to-primary/80 hover:bg-primary/90 text-primary-foreground px-6 py-3 rounded-xl text-sm font-medium transition-all flex items-center gap-2 shadow-md"
+                  >
+                    <Download className="h-4 w-4" />
+                    Download
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={handleGenerate}
+                    disabled={isGenerating}
+                    className="bg-background border-primary/20 text-foreground hover:bg-primary/10 hover:text-foreground px-6 py-3 rounded-xl text-sm font-medium transition-all flex items-center gap-2"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    Regenerate
+                  </Button>
                 </div>
               </div>
             ) : (
               <div className="text-center">
-                <div className="relative mx-auto w-16 h-16 mb-3">
-                  <Palette className="h-16 w-16 text-muted-foreground animate-pulse" />
-                  <Sparkles className="h-6 w-6 text-primary absolute -top-1 -right-1 animate-bounce" />
-                </div>
-                <p className="text-lg font-bold text-foreground mb-1">Ready to Create</p>
-                <p className="text-sm text-muted-foreground">Enter your prompt and generate</p>
+                <TextType
+                  text={[
+                    "Create Amazing Ads with AI",
+                    "Transform Ideas into Visuals",
+                    "Design with AI Power",
+                    "Generate Stunning Content",
+                    "Bring Your Vision to Life"
+                  ]}
+                  className="text-5xl font-black text-white mb-2"
+                  typingSpeed={60}
+                  deletingSpeed={40}
+                  pauseDuration={1500}
+                  loop={true}
+                  showCursor={true}
+                  cursorCharacter="|"
+                  cursorClassName="text-white text-6xl animate-pulse font-black"
+                  textColors={['#ffffff', '#ffffff', '#ffffff', '#ffffff', '#ffffff']}
+                />
               </div>
             )}
           </div>
 
-          {/* Design History - Right Side */}
-          <div className="w-80 flex flex-col min-h-0">
-            <h3 className="text-lg font-bold text-foreground mb-3 text-center">
-              Design History
-            </h3>
-            
-            <div className="flex-1 overflow-hidden">
-              {adsLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                  <span className="ml-2 text-sm text-muted-foreground">Loading...</span>
+          {/* Bottom Search Bar Section */}
+          <div className="flex-shrink-0 p-2">
+            <div className="w-full max-w-4xl mx-auto">
+              <div className="bg-black border border-gray-800 rounded-lg p-3">
+                <div className="flex items-center gap-3">
+                {/* Design Category Button */}
+                <div className="relative dropdown-container">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={`flex items-center gap-2 h-10 px-4 bg-black border-gray-700 hover:bg-gray-900 text-gray-300 text-sm rounded-lg transition-all ${
+                      selectedCategory ? "bg-primary/10 text-foreground border-primary" : ""
+                    }`}
+                    onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                  >
+                    {selectedCategory ? (
+                      <>
+                        {(() => {
+                          const category = categories.find(c => c.id === selectedCategory);
+                          const IconComponent = category?.icon || Palette;
+                          return <IconComponent className="h-3 w-3" />;
+                        })()}
+                        <span className="text-xs hidden sm:block">
+                          {categories.find(c => c.id === selectedCategory)?.name.split(' ')[0]}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <Palette className="h-3 w-3" />
+                        <span className="text-xs hidden sm:block">Design</span>
+                      </>
+                    )}
+                  </Button>
+                  
+                  {showCategoryDropdown && (
+                    <div className="absolute bottom-12 left-0 bg-black border border-gray-700 rounded-lg p-3 z-50 min-w-[240px] shadow-xl" style={{ scrollbarWidth: 'thin', scrollbarColor: '#374151 transparent' }}>
+                      <div className="grid grid-cols-2 gap-1">
+                        {categories.map((category) => {
+                          const IconComponent = category.icon;
+                          return (
+                            <Button
+                              key={category.id}
+                              variant="ghost"
+                              size="sm"
+                              className={`h-10 flex flex-col items-center gap-1 rounded-lg hover:bg-gray-900 text-sm transition-all ${
+                                selectedCategory === category.id 
+                                  ? "bg-primary text-primary-foreground" 
+                                  : "text-muted-foreground hover:text-foreground"
+                              }`}
+                              onClick={() => {
+                                setSelectedCategory(category.id);
+                                setShowCategoryDropdown(false);
+                              }}
+                            >
+                              <div className={`p-1 rounded-sm ${selectedCategory === category.id ? "bg-white/20" : "bg-gray-800"}`}>
+                                <IconComponent className="h-3 w-3" />
+                              </div>
+                              <span className="text-xs font-medium">{category.name.split(' ')[0]}</span>
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              ) : myAds.length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="relative mx-auto w-12 h-12 mb-3">
-                    <ImageIcon className="h-12 w-12 text-muted-foreground" />
-                    <Sparkles className="h-4 w-4 text-primary absolute -top-1 -right-1 animate-bounce" />
-                  </div>
-                  <p className="text-sm text-muted-foreground font-medium">No designs yet</p>
-                  <p className="text-xs text-muted-foreground/70 mt-1">Create your first design!</p>
+
+                {/* Ratio Button */}
+                <div className="relative dropdown-container">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={`flex items-center gap-2 h-10 px-4 bg-black border-gray-700 hover:bg-gray-900 text-gray-300 text-sm rounded-lg transition-all ${
+                      selectedSize ? "bg-primary/10 text-foreground border-primary" : ""
+                    }`}
+                    onClick={() => setShowRatioDropdown(!showRatioDropdown)}
+                  >
+                    <div className="border border-gray-400 rounded bg-gray-600" 
+                         style={{ 
+                           width: selectedSize ? 
+                             (sizes.find(s => s.id === selectedSize)?.ratio === '1:1' ? '10px' : 
+                              sizes.find(s => s.id === selectedSize)?.ratio.includes('16:9') ? '12px' : '8px') : '10px',
+                           height: selectedSize ? 
+                             (sizes.find(s => s.id === selectedSize)?.ratio === '1:1' ? '10px' : 
+                              sizes.find(s => s.id === selectedSize)?.ratio.includes('16:9') ? '7px' : '12px') : '10px'
+                         }}>
+                    </div>
+                    <span className="text-sm hidden sm:block">
+                      {selectedSize ? sizes.find(s => s.id === selectedSize)?.ratio : "Ratio"}
+                    </span>
+                  </Button>
+                  
+                  {showRatioDropdown && (
+                    <div className="absolute bottom-12 left-0 bg-black border border-gray-700 rounded-lg p-3 z-50 min-w-[160px] shadow-xl" style={{ scrollbarWidth: 'thin', scrollbarColor: '#374151 transparent' }}>
+                      <div className="space-y-1">
+                        {sizes.map((size) => (
+                          <Button
+                            key={size.id}
+                            variant="ghost"
+                            size="sm"
+                            className={`w-full flex items-center gap-2 justify-start h-8 rounded-md hover:bg-gray-700 text-xs ${
+                              selectedSize === size.id 
+                                ? "bg-gray-700 text-gray-200" 
+                                : "text-gray-400 hover:text-gray-200"
+                            }`}
+                            onClick={() => {
+                              setSelectedSize(size.id);
+                              setShowRatioDropdown(false);
+                            }}
+                          >
+                            <div className="border border-gray-400 rounded bg-gray-600" 
+                                 style={{ 
+                                   width: size.ratio === '1:1' ? '8px' : size.ratio.includes('16:9') ? '10px' : '6px',
+                                   height: size.ratio === '1:1' ? '8px' : size.ratio.includes('16:9') ? '6px' : '10px'
+                                 }}>
+                            </div>
+                            <div className="text-left">
+                              <div className="text-xs">{size.name}</div>
+                              <div className="text-xs text-gray-500">{size.ratio}</div>
+                            </div>
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <ScrollArea className="h-full">
-                  <div className="grid grid-cols-2 gap-2 p-2">
-                    {myAds.slice(0, 8).map((ad, index) => (
-                      <div 
-                        key={ad._id} 
-                        className="group relative aspect-square animate-in fade-in-50 hover:scale-105 transition-all duration-300"
-                        style={{ animationDelay: `${index * 30}ms` }}
-                      >
-                        <img
-                          src={ad.url}
-                          alt={ad.prompt}
-                          className="w-full h-full object-cover rounded-lg border border-border shadow-sm transition-all duration-300 group-hover:shadow-md group-hover:border-primary/50"
-                        />
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/60 transition-all duration-300 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
-                          <div className="flex gap-1">
-                            <Dialog>
-                              <DialogTrigger asChild>
-                                <Button size="sm" variant="secondary" className="h-6 w-6 p-0">
-                                  <Eye className="h-3 w-3" />
-                                </Button>
-                              </DialogTrigger>
-                              <DialogContent className="max-w-2xl bg-background border border-border">
-                                <DialogHeader>
-                                  <DialogTitle className="flex items-center gap-2 text-primary">
-                                    <Sparkles className="h-4 w-4" />
-                                    Generated Design
-                                  </DialogTitle>
-                                </DialogHeader>
-                                <div className="space-y-3">
-                                  <img
-                                    src={ad.url}
-                                    alt={ad.prompt}
-                                    className="w-full max-h-[50vh] object-contain rounded-lg border border-border"
-                                  />
-                                  <div className="bg-card p-3 rounded-lg border border-border">
-                                    <strong className="text-primary text-sm">Prompt:</strong>
-                                    <p className="mt-1 text-sm text-muted-foreground">{ad.prompt}</p>
-                                  </div>
+
+                {/* Main Search Input */}
+                <div className="flex-1 relative">
+                  <Textarea
+                    placeholder="Describe your ad... Be creative and specific!"
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    rows={1}
+                    className="w-full min-h-[40px] bg-black border border-gray-700 text-white placeholder-gray-400 resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base rounded-lg px-4 py-3 pr-20"
+                    style={{ scrollbarWidth: 'thin', scrollbarColor: '#374151 transparent' }}
+                    onInput={(e) => {
+                      const target = e.target as HTMLTextAreaElement;
+                      target.style.height = 'auto';
+                      target.style.height = Math.max(40, Math.min(80, target.scrollHeight)) + 'px';
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        if (!isGenerating && prompt.trim()) {
+                          handleGenerate();
+                        }
+                      }
+                    }}
+                  />
+                  <Button 
+                    onClick={handleGenerate} 
+                    disabled={isGenerating || !prompt.trim()}
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-gradient-to-r from-primary to-primary/80 hover:bg-primary/90 text-primary-foreground px-4 py-2 h-auto rounded-xl border-0 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-all shadow-md"
+                  >
+                    {isGenerating ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        </div>
+
+        {/* Right Sidebar - Design History */}
+        <div className="w-64 flex flex-col border-l border-gray-800 bg-black">
+          <div className="p-4 border-b border-gray-800">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-4 h-4 bg-gray-700 rounded-sm flex items-center justify-center">
+                <ImageIcon className="h-2 w-2 text-gray-400" />
+              </div>
+              <h3 className="text-xl font-medium text-white">History</h3>
+            </div>
+        
+          </div>
+          
+          <div className="flex-1 overflow-hidden p-2">
+            {adsLoading ? (
+              <div className="flex flex-col items-center justify-center py-4">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mb-1"></div>
+                <span className="text-xs text-gray-500">Loading...</span>
+              </div>
+            ) : myAds.length === 0 ? (
+              <div className="text-center py-4">
+                <div className="mx-auto w-8 h-8 mb-2">
+                  <ImageIcon className="h-8 w-8 text-gray-600" />
+                </div>
+                <p className="text-gray-500 text-xs mb-1">No designs yet</p>
+                <p className="text-gray-600 text-xs">Create your first ad</p>
+              </div>
+            ) : (
+              <div 
+                className="h-full overflow-y-auto"
+                style={{ 
+                  scrollbarWidth: 'thin', 
+                  scrollbarColor: '#374151 transparent'
+                }}
+              >
+                <div className="grid grid-cols-2 gap-2">
+                  {myAds.slice(0, 12).map((ad, index) => (
+                    <div 
+                      key={ad._id} 
+                      className="group relative aspect-square"
+                    >
+                      <img
+                        src={ad.url}
+                        alt={ad.prompt}
+                        className="w-full h-full object-cover rounded-lg border border-gray-600"
+                      />
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                        <div className="flex gap-1">
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button size="sm" className="h-6 w-6 p-0 bg-gray-700 hover:bg-gray-600 border-0 text-xs">
+                                <Eye className="h-3 w-3" />
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-2xl bg-gray-800 border border-gray-600">
+                              <DialogHeader>
+                                <DialogTitle className="flex items-center gap-2 text-gray-300">
+                                  <ImageIcon className="h-4 w-4" />
+                                  Generated Design
+                                </DialogTitle>
+                              </DialogHeader>
+                              <div className="space-y-3">
+                                <img
+                                  src={ad.url}
+                                  alt={ad.prompt}
+                                  className="w-full max-h-[50vh] object-contain rounded-lg border border-gray-600"
+                                />
+                                <div className="bg-black p-3 rounded-lg border border-gray-800">
+                                  <strong className="text-gray-300 text-xs">Prompt:</strong>
+                                  <p className="mt-1 text-xs text-gray-400">{ad.prompt}</p>
                                 </div>
-                              </DialogContent>
-                            </Dialog>
-                            
-                            <Button 
-                              size="sm" 
-                              variant="secondary"
-                              onClick={() => handleDownloadAd(ad)}
-                              className="h-6 w-6 p-0"
-                            >
-                              <Download className="h-3 w-3" />
-                            </Button>
-                            
-                            <Button 
-                              size="sm" 
-                              variant="destructive"
-                              onClick={() => handleDeleteAd(ad._id)}
-                              className="h-6 w-6 p-0"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent text-white p-1 rounded-b-lg">
-                          <p className="text-xs truncate font-medium">{ad.prompt}</p>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                          
+                          <Button 
+                            size="sm" 
+                            onClick={() => handleDownloadAd(ad)}
+                            className="h-6 w-6 p-0 bg-gray-700 hover:bg-gray-600 border-0 text-xs"
+                          >
+                            <Download className="h-3 w-3" />
+                          </Button>
+                          
+                          <Button 
+                            size="sm" 
+                            onClick={() => handleDeleteAd(ad._id)}
+                            className="h-6 w-6 p-0 bg-gray-700 hover:bg-gray-600 border-0 text-xs"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
                         </div>
                       </div>
-                    ))}
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/80 text-white p-1 rounded-b-lg">
+                        <p className="text-xs truncate">{ad.prompt}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {myAds.length > 12 && (
+                  <div className="text-center mt-2">
+                    <p className="text-xs text-gray-600">+{myAds.length - 12} more</p>
                   </div>
-                </ScrollArea>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
     </div>
+    
   );
 };
 
