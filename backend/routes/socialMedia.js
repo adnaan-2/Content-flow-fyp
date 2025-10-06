@@ -1,9 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const SocialAccount = require('../models/SocialAccount');
-const User = require('../models/User');
 const { authenticateToken } = require('../middleware/auth');
-const notificationService = require('../utils/notificationService');
 const axios = require('axios');
 
 // Meta (Facebook/Instagram) configuration
@@ -246,18 +244,6 @@ router.post('/auth/facebook/callback', authenticateToken, async (req, res) => {
     } else {
       facebookAccount = await SocialAccount.create(accountData);
       console.log('✨ Created new Facebook account');
-      
-      // Send notification for new Facebook connection
-      try {
-        const user = await User.findById(req.user.id);
-        if (user) {
-          await notificationService.sendSocialAccountConnectedNotification(req.user.id, 'Facebook', facebookUser.name);
-          console.log('� Facebook connection notification sent to user:', req.user.id);
-        }
-      } catch (notificationError) {
-        console.error('� Facebook connection notification error:', notificationError);
-        // Don't fail the connection if notification fails
-      }
     }
 
     // Step 5: Handle Instagram business accounts
@@ -307,18 +293,6 @@ router.post('/auth/facebook/callback', authenticateToken, async (req, res) => {
           } else {
             await SocialAccount.create(instagramAccountData);
             console.log('✨ Created Instagram account:', instagramData.username);
-            
-            // Send email notification for new Instagram connection
-            try {
-              const user = await User.findById(req.user.id);
-              if (user) {
-                await notificationService.sendSocialAccountConnectedNotification(req.user.id, 'Instagram', instagramData.username);
-                console.log('📧 Instagram connection email sent to:', user.email);
-              }
-            } catch (emailError) {
-              console.error('📧 Instagram connection email error:', emailError);
-              // Don't fail the connection if email fails
-            }
           }
 
         } catch (instagramError) {
@@ -455,18 +429,6 @@ router.post('/auth/linkedin/callback', authenticateToken, async (req, res) => {
     } else {
       savedAccount = await SocialAccount.create(accountData);
       console.log('✨ Created new LinkedIn account');
-      
-      // Send email notification for new LinkedIn connection
-      try {
-        const user = await User.findById(req.user.id);
-        if (user) {
-          await notificationService.sendSocialAccountConnectedNotification(req.user.id, 'LinkedIn', profile.name);
-          console.log('📧 LinkedIn connection email sent to:', user.email);
-        }
-      } catch (emailError) {
-        console.error('📧 LinkedIn connection email error:', emailError);
-        // Don't fail the connection if email fails
-      }
     }
 
     console.log('LinkedIn account saved to database:', savedAccount._id);
@@ -847,18 +809,6 @@ router.post('/auth/x/callback', authenticateToken, async (req, res) => {
       userId: xAccount.userId
     });
 
-    // Send email notification for new X connection
-    try {
-      const user = await User.findById(req.user.id);
-      if (user) {
-        await notificationService.sendSocialAccountConnectedNotification(req.user.id, 'X (Twitter)', userData.screen_name);
-        console.log('📧 X connection email sent to:', user.email);
-      }
-    } catch (emailError) {
-      console.error('📧 X connection email error:', emailError);
-      // Don't fail the connection if email fails
-    }
-
     res.json({ 
       success: true, 
       message: 'X account connected successfully',
@@ -932,18 +882,6 @@ router.delete('/accounts/:accountId', authenticateToken, async (req, res) => {
 
     // Delete the main account
     await SocialAccount.findByIdAndDelete(account._id);
-
-    // Send disconnection notification
-    try {
-      await notificationService.sendSocialAccountDisconnectedNotification(
-        req.user.id, 
-        account.platform.charAt(0).toUpperCase() + account.platform.slice(1), 
-        account.accountName
-      );
-      console.log('📱 Account disconnection notification sent to user:', req.user.id);
-    } catch (notificationError) {
-      console.error('📱 Account disconnection notification error:', notificationError);
-    }
 
     console.log(`🗑️  Deleted ${account.platform} account: ${account.accountName}`);
     res.json({ 

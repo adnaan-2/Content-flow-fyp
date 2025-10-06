@@ -180,9 +180,7 @@ const Dashboard = () => {
                     <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                     <XAxis dataKey="name" />
                     <YAxis />
-                    <ChartTooltip>
-                      <ChartTooltipContent />
-                    </ChartTooltip>
+                    <Tooltip content={<ChartTooltipContent />} />
                     <Line
                       type="monotone"
                       dataKey="facebook"
@@ -224,9 +222,7 @@ const Dashboard = () => {
                     <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                     <XAxis dataKey="name" />
                     <YAxis />
-                    <ChartTooltip>
-                      <ChartTooltipContent />
-                    </ChartTooltip>
+                    <Tooltip content={<ChartTooltipContent />} />
                     <Bar dataKey="value" />
                   </BarChart>
                 </ChartContainer>
@@ -249,9 +245,7 @@ const Dashboard = () => {
                     <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                     <XAxis dataKey="name" />
                     <YAxis />
-                    <ChartTooltip>
-                      <ChartTooltipContent />
-                    </ChartTooltip>
+                    <Tooltip content={<ChartTooltipContent />} />
                     <Area
                       type="monotone"
                       dataKey="facebook"
