@@ -147,7 +147,7 @@ export default function LinkAccounts() {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const response = await fetch('/api/social-media/accounts', {
+      const response = await fetch('http://localhost:5000/api/social-media/accounts', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -200,7 +200,7 @@ export default function LinkAccounts() {
       // Store the platform for the callback
       sessionStorage.setItem('connecting_platform', platform);
 
-      const response = await fetch(`/api/social-media/auth/${platform}`, {
+      const response = await fetch(`http://localhost:5000/api/social-media/auth/${platform}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -218,12 +218,12 @@ export default function LinkAccounts() {
           );
 
           // Polling method as fallback for Cross-Origin-Opener-Policy issues
-          let pollTimer: NodeJS.Timeout;
+          let pollTimer: NodeJS.Timeout | null = null;
           
           const pollPopup = () => {
             try {
               if (popup?.closed) {
-                clearInterval(pollTimer);
+                if (pollTimer) clearInterval(pollTimer);
                 console.log('Popup was closed, refreshing accounts...');
                 // Wait a moment and then refresh accounts
                 setTimeout(() => {
@@ -240,7 +240,7 @@ export default function LinkAccounts() {
                 if (popupUrl && popupUrl.includes('/auth/callback')) {
                   console.log('Detected callback URL, refreshing accounts...');
                   popup?.close();
-                  clearInterval(pollTimer);
+                  if (pollTimer) clearInterval(pollTimer);
                   setTimeout(() => {
                     fetchConnectedAccounts();
                     setConnectingPlatform(null);
@@ -265,6 +265,15 @@ export default function LinkAccounts() {
             const { type, platform, message, account, accounts, error } = event.data;
             
             if (type === 'AUTH_SUCCESS') {
+              // CRITICAL: Stop popup monitoring and cleanup
+              if (pollTimer) clearInterval(pollTimer);
+              window.removeEventListener('message', handleMessage);
+              
+              // Close the popup window
+              if (popup && !popup.closed) {
+                popup.close();
+              }
+              
               // Show success notification
               setSuccessMessage(`${platform} account connected successfully!`);
               setShowSuccess(true);
@@ -287,6 +296,15 @@ export default function LinkAccounts() {
               setTimeout(() => setShowSuccess(false), 3000);
               
             } else if (type === 'AUTH_ERROR') {
+              // CRITICAL: Stop popup monitoring and cleanup
+              if (pollTimer) clearInterval(pollTimer);
+              window.removeEventListener('message', handleMessage);
+              
+              // Close the popup window
+              if (popup && !popup.closed) {
+                popup.close();
+              }
+              
               console.error(`${platform} connection failed:`, error);
               setErrorMessage(`Failed to connect ${platform}: ${error}`);
               setShowError(true);
@@ -295,9 +313,11 @@ export default function LinkAccounts() {
               setTimeout(() => setShowError(false), 5000);
             }
             
+            // Reset state after handling success/error
             setConnectingPlatform(null);
             setLoading(false);
           };
+
 
           window.addEventListener('message', handleMessage);
 
@@ -346,7 +366,7 @@ export default function LinkAccounts() {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const response = await fetch(`/api/social-media/accounts/${accountId}`, {
+      const response = await fetch(`http://localhost:5000/api/social-media/accounts/${accountId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -373,7 +393,7 @@ export default function LinkAccounts() {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const response = await fetch(`/api/social-media/accounts/platform/${platform}`, {
+      const response = await fetch(`http://localhost:5000/api/social-media/accounts/platform/${platform}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -638,6 +658,26 @@ export default function LinkAccounts() {
             );
           })}
         </div>
+
+        {/* Success Notification */}
+        {showSuccess && (
+          <div className="fixed top-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center space-x-2">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            <span>{successMessage}</span>
+          </div>
+        )}
+
+        {/* Error Notification */}
+        {showError && (
+          <div className="fixed top-4 right-4 bg-red-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center space-x-2">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            <span>{errorMessage}</span>
+          </div>
+        )}
 
       </div>
     </div>

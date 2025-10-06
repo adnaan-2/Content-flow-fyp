@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Bell, User, ChevronDown, Menu } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNotifications } from "@/contexts/NotificationContext";
 import { 
   Avatar, 
   AvatarFallback, 
@@ -15,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 
 // Define the proper props interface with toggleSidebar
@@ -23,8 +25,8 @@ interface DashboardHeaderProps {
 }
 
 const DashboardHeader = ({ toggleSidebar }: DashboardHeaderProps) => {
-  const [notificationCount, setNotificationCount] = useState(3);
   const { user, logout } = useAuth();
+  const { unreadCount } = useNotifications();
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -61,12 +63,19 @@ const DashboardHeader = ({ toggleSidebar }: DashboardHeaderProps) => {
       
       <div className="flex items-center space-x-4">
         <div className="relative">
-          <Button variant="ghost" size="icon" className="relative">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="relative" 
+            onClick={() => navigate('/dashboard/notifications')}
+          >
             <Bell className="h-5 w-5" />
-            {notificationCount > 0 && (
-              <span className="absolute top-0 right-0 h-5 w-5 flex items-center justify-center text-xs bg-primary text-white rounded-full">
-                {notificationCount}
-              </span>
+            {unreadCount > 0 && (
+              <Badge 
+                className="absolute -top-1 -right-1 h-5 min-w-5 flex items-center justify-center text-xs bg-red-500 hover:bg-red-600 text-white rounded-full px-1"
+              >
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </Badge>
             )}
           </Button>
         </div>
@@ -87,23 +96,37 @@ const DashboardHeader = ({ toggleSidebar }: DashboardHeaderProps) => {
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuItem className="flex flex-col items-start">
-              <span className="font-medium">{user?.name || "User Name"}</span>
-              <span className="text-xs text-muted-foreground">{user?.email || "user@example.com"}</span>
-            </DropdownMenuItem>
+          <DropdownMenuContent align="end" className="w-64">
+            <div className="px-3 py-2">
+              <p className="font-medium text-sm">
+                {user?.name || "No name available"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {user?.email || "No email available"}
+              </p>
+            </div>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link to="/dashboard/profile" className="w-full cursor-pointer">Profile</Link>
+              <Link to="/dashboard/profile" className="w-full cursor-pointer">
+                <User className="mr-2 h-4 w-4" />
+                Profile
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link to="/dashboard/subscription" className="w-full cursor-pointer">Subscription</Link>
+              <Link to="/dashboard/subscription" className="w-full cursor-pointer">
+                <span className="mr-2">💳</span>
+                Subscription
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link to="/dashboard/settings" className="w-full cursor-pointer">Settings</Link>
+              <Link to="/dashboard/settings" className="w-full cursor-pointer">
+                <span className="mr-2">⚙️</span>
+                Settings
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
+            <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600">
+              <span className="mr-2">🔓</span>
               Log out
             </DropdownMenuItem>
           </DropdownMenuContent>

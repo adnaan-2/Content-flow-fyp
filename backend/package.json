@@ -41,6 +41,7 @@
     "passport-instagram": "^1.0.0",
     "passport-linkedin-oauth2": "^2.0.0",
     "passport-twitter": "^1.0.4",
-    "streamifier": "^0.1.1"
+    "streamifier": "^0.1.1",
+    "ua-parser-js": "^2.0.5"
   }
 }

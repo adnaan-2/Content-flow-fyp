@@ -2,6 +2,9 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const cloudinary = require('cloudinary').v2;
 const streamifier = require('streamifier');
+const notificationService = require('../utils/notificationService');
+const { sendPasswordChangeSuccessEmail } = require('../utils/emailService');
+const deviceUtils = require('../utils/deviceUtils');
 
 // Configure Cloudinary
 cloudinary.config({
@@ -79,7 +82,25 @@ exports.changePassword = async (req, res) => {
     
     // Save the new password
     await user.save();
-    
+
+    // Send in-app notification
+    try {
+      await notificationService.sendPasswordChangedNotification(req.user.id);
+      console.log('📱 Password change notification sent to user:', req.user.id);
+    } catch (notificationError) {
+      console.error('📱 Password change notification error:', notificationError);
+    }
+
+    // Send security email notification
+    try {
+      const deviceInfo = deviceUtils.getDeviceInfo(req);
+      const changeTime = new Date().toLocaleString();
+      await sendPasswordChangeSuccessEmail(user.email, user.name, changeTime, deviceInfo);
+      console.log('📧 Password change security email sent to:', user.email);
+    } catch (emailError) {
+      console.error('📧 Password change email error:', emailError);
+    }
+
     res.json({ success: true, message: 'Password changed successfully' });
   } catch (err) {
     console.error('Error changing password:', err.message);

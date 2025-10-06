@@ -120,9 +120,17 @@ app.use('/api/caption', captionRoutes);
 const socialMediaRoutes = require('./routes/socialMedia');
 app.use('/api/social-media', socialMediaRoutes);
 
+// Add subscription routes
+const subscriptionRoutes = require('./routes/subscriptionRoutes');
+app.use('/api/subscription', subscriptionRoutes);
+
 // Add post routes
 const postRoutes = require('./routes/postRoutes');
 app.use('/api/posts', postRoutes);
+
+// Add notification routes
+const notificationRoutes = require('./routes/notificationRoutes');
+app.use('/api/notifications', notificationRoutes);
 
 // Serve static assets in production
 if (process.env.NODE_ENV === 'production') {

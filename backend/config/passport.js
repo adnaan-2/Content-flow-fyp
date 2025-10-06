@@ -1,6 +1,7 @@
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const User = require('../models/User');
+const { sendWelcomeEmail } = require('../utils/emailService');
 
 // Debug environment variables
 console.log('Passport Config - Google Client ID:', process.env.GOOGLE_CLIENT_ID ? 'SET' : 'NOT SET');
@@ -50,6 +51,16 @@ passport.use(new GoogleStrategy({
     });
     
     console.log('Created new Google user:', newUser.email);
+    
+    // Send welcome email for new Google users
+    try {
+      await sendWelcomeEmail(newUser.email, newUser.name, 'google');
+      console.log('Welcome email sent to new Google user:', newUser.email);
+    } catch (error) {
+      console.error('Welcome email sending error for Google user:', error);
+      // Don't fail the authentication if email fails
+    }
+    
     return done(null, newUser);
     
   } catch (error) {

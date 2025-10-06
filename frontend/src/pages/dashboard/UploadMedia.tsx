@@ -75,7 +75,7 @@ const UploadMedia = () => {
         const token = localStorage.getItem('token');
         if (!token) return;
 
-        const response = await fetch('/api/social-media/accounts', {
+        const response = await fetch('http://localhost:5000/api/social-media/accounts', {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'

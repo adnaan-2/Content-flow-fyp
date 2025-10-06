@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -10,14 +10,171 @@ export default function AuthCallback() {
   const { toast } = useToast();
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
   const [message, setMessage] = useState('Processing authentication...');
+  const hasProcessed = useRef(false);
+
+  const processSocialMediaCallback = async (platform: string, params: {
+    code?: string | null;
+    state?: string | null;
+    oauth_token?: string | null;
+    oauth_verifier?: string | null;
+  }) => {
+    try {
+      console.log(`🔄 Starting social media callback for ${platform}`);
+      
+      setStatus('processing');
+      setMessage(`Connecting your ${platform} account...`);
+
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+
+      let requestBody;
+      if (params.code && params.state) {
+        // OAuth 2.0 flow (LinkedIn)
+        requestBody = { code: params.code, state: params.state };
+      } else if (params.oauth_token && params.oauth_verifier) {
+        // OAuth 1.0a flow (X/Twitter)
+        requestBody = { oauth_token: params.oauth_token, oauth_verifier: params.oauth_verifier };
+      } else {
+        throw new Error('Invalid OAuth parameters');
+      }
+
+      const response = await fetch(`http://localhost:5000/api/social-media/auth/${platform}/callback`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setStatus('success');
+        setMessage(`${platform} account connected successfully!`);
+        
+        toast({
+          title: "Account Connected",
+          description: `Your ${platform} account has been successfully connected.`,
+        });
+
+        // Send success message to parent window
+        if (window.opener) {
+          console.log('🔄 Sending success message to parent window');
+          
+          // Show success message in popup
+          setStatus('success');
+          setMessage('✅ Account connected successfully!');
+          
+          // Send message to parent window immediately
+          window.opener.postMessage({
+            type: 'AUTH_SUCCESS',
+            platform: platform,
+            message: 'Successfully connected your account!',
+            account: data.account,
+            accounts: data.accounts
+          }, window.location.origin);
+          
+          // Parent window will close this popup, but add fallback
+          setTimeout(() => {
+            if (!window.closed) {
+              console.log('🔄 Fallback: popup still open, attempting self-close');
+              try {
+                window.close();
+              } catch (e) {
+                setMessage('✅ Account connected! You can close this window.');
+              }
+            }
+          }, 2000);
+          
+          return;
+        }
+        
+        // Otherwise redirect to dashboard
+        setTimeout(() => {
+          navigate('/dashboard/link-accounts', { replace: true });
+        }, 2000);
+      } else {
+        throw new Error(data.message || 'Social media connection failed');
+      }
+    } catch (error: any) {
+      console.error('Social media callback error:', error);
+      setStatus('error');
+      setMessage(`Failed to connect ${platform} account: ${error.message}`);
+      
+      toast({
+        title: "Connection Failed",
+        description: `Failed to connect your ${platform} account. Please try again.`,
+        variant: "destructive",
+      });
+
+      // Close popup window with error if this is a popup
+      if (window.opener) {
+        console.log('🔄 Sending error message to parent window');
+        
+        // Show error message in popup
+        setStatus('error');
+        setMessage(`❌ Connection failed: ${error.message}`);
+        
+        // Send error message to parent window immediately
+        window.opener.postMessage({ 
+          type: 'AUTH_ERROR', 
+          platform, 
+          error: error.message
+        }, '*');
+        
+        // Parent window will close this popup, but add fallback
+        setTimeout(() => {
+          if (!window.closed) {
+            console.log('🔄 Fallback: popup still open, attempting self-close');
+            try {
+              window.close();
+            } catch (e) {
+              setMessage('❌ Connection failed. You can close this window.');
+            }
+          }
+        }, 2000);
+        
+        return;
+      }
+
+      // Otherwise redirect back to link accounts page
+      setTimeout(() => {
+        navigate('/dashboard/link-accounts', { replace: true });
+      }, 3000);
+    }
+  };
 
   useEffect(() => {
     const processCallback = async () => {
+      // Prevent duplicate processing
+      if (hasProcessed.current) {
+        return;
+      }
+      hasProcessed.current = true;
       try {
         const urlParams = new URLSearchParams(location.search);
         const token = urlParams.get('token');
         const userParam = urlParams.get('user');
         const error = urlParams.get('error');
+        const platform = urlParams.get('platform');
+        
+        // Check if this is a social media authentication callback
+        const code = urlParams.get('code');
+        const state = urlParams.get('state');
+        const oauth_token = urlParams.get('oauth_token');
+        const oauth_verifier = urlParams.get('oauth_verifier');
+        
+        console.log('🔄 Checking for social media callback', { platform, code: !!code, state: !!state });
+        console.log('🔄 Current URL:', window.location.href);
+        
+        if (platform && ((code && state) || (oauth_token && oauth_verifier))) {
+          console.log('🔄 Processing social media callback for:', platform);
+          await processSocialMediaCallback(platform, { code, state, oauth_token, oauth_verifier });
+          return;
+        }
 
         if (error) {
           setStatus('error');
@@ -86,6 +243,7 @@ export default function AuthCallback() {
         
       } catch (error) {
         console.error('AuthCallback processing error:', error);
+        hasProcessed.current = false; // Reset flag on error to allow retry
         setStatus('error');
         setMessage('Failed to process authentication. Please try again.');
         
@@ -102,7 +260,7 @@ export default function AuthCallback() {
     };
 
     processCallback();
-  }, [location, navigate, login, toast]);
+  }, []); // Empty dependency array to prevent duplicate calls
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-900 via-slate-900 to-black p-4">

@@ -1,5 +1,7 @@
 const Post = require('../models/Post');
 const SocialAccount = require('../models/SocialAccount');
+const User = require('../models/User');
+const notificationService = require('../utils/notificationService');
 const axios = require('axios');
 const schedule = require('node-schedule');
 
@@ -840,6 +842,26 @@ const postNow = async (req, res) => {
       });
     }
 
+    // Send email notification for successful posts
+    if (results.length > 0) {
+      try {
+        const user = await User.findById(userId);
+        if (user) {
+          const postDetails = {
+            id: post._id,
+            title: caption ? caption.substring(0, 50) : 'New Post',
+            content: caption || 'Media post',
+            platforms: results.map(r => r.platform)
+          };
+          await notificationService.sendPostPublishedNotification(userId, postDetails);
+          console.log('� Post published notification sent to user:', userId);
+        }
+      } catch (notificationError) {
+        console.error('� Post published notification error:', notificationError);
+        // Don't fail the response if notification fails
+      }
+    }
+
     res.json({
       message: 'Posts processed',
       results,
@@ -925,6 +947,8 @@ const schedulePost = async (req, res) => {
     const job = schedule.scheduleJob(scheduleDate, async () => {
       console.log(`Executing scheduled post job: ${jobId}`);
       
+      const publishedPlatforms = [];
+      
       for (const post of scheduledPosts) {
         try {
           const account = await SocialAccount.findById(post.socialAccountId);
@@ -950,6 +974,7 @@ const schedulePost = async (req, res) => {
             publishedTime: new Date()
           });
 
+          publishedPlatforms.push(post.platform);
           console.log(`Successfully posted scheduled content to ${post.platform}`);
 
         } catch (error) {
@@ -959,6 +984,25 @@ const schedulePost = async (req, res) => {
             errorMessage: error.message,
             publishedTime: new Date()
           });
+        }
+      }
+
+      // Send notification for published scheduled posts
+      if (publishedPlatforms.length > 0) {
+        try {
+          const user = await User.findById(userId);
+          if (user && scheduledPosts.length > 0) {
+            const postDetails = {
+              id: scheduledPosts[0]._id,
+              title: scheduledPosts[0].content.text ? scheduledPosts[0].content.text.substring(0, 50) : 'Scheduled Post',
+              content: scheduledPosts[0].content.text || 'Media post',
+              platforms: publishedPlatforms
+            };
+            await notificationService.sendPostPublishedNotification(userId, postDetails);
+            console.log('� Scheduled post published notification sent to user:', userId);
+          }
+        } catch (notificationError) {
+          console.error('� Scheduled post published notification error:', notificationError);
         }
       }
 
@@ -972,6 +1016,25 @@ const schedulePost = async (req, res) => {
       postIds: scheduledPosts.map(p => p._id),
       scheduledTime: scheduleDate
     });
+
+    // Send email notification for post scheduling
+    try {
+      const user = await User.findById(userId);
+      if (user) {
+        const postDetails = {
+          id: newPost._id,
+          title: caption ? caption.substring(0, 50) : 'New Post',
+          content: caption || 'Media post',
+          scheduledTime: scheduleDate,
+          platforms: platforms
+        };
+        await notificationService.sendPostScheduledNotification(userId, postDetails);
+        console.log('� Post scheduled notification sent to user:', userId);
+      }
+    } catch (notificationError) {
+      console.error('� Post scheduled notification error:', notificationError);
+      // Don't fail the scheduling if notification fails
+    }
 
     res.json({
       message: 'Posts scheduled successfully',

@@ -2,7 +2,8 @@ const User = require('../models/User'); // Fixed import path
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const passport = require('../config/passport');
-const { generateVerificationCode, generateResetToken, sendVerificationEmail, sendPasswordResetEmail, sendPasswordResetCodeEmail } = require('../utils/emailService');
+const { generateVerificationCode, generateResetToken, sendVerificationEmail, sendPasswordResetEmail, sendPasswordResetCodeEmail, sendWelcomeEmail, sendNewDeviceLoginEmail } = require('../utils/emailService');
+const { getDeviceInfo, createDeviceFingerprint, isNewDevice, addKnownDevice, updateDeviceLastUsed, getLocationFromIP } = require('../utils/deviceUtils');
 
 const register = async (req, res) => {
   const { name, email, password } = req.body;
@@ -199,6 +200,15 @@ const verifyEmail = async (req, res) => {
     user.verificationCodeExpires = null;
     await user.save();
 
+    // Send welcome email after successful verification
+    try {
+      await sendWelcomeEmail(user.email, user.name, 'email');
+      console.log('Welcome email sent to:', user.email);
+    } catch (error) {
+      console.error('Welcome email sending error:', error);
+      // Don't fail the verification if email fails
+    }
+
     // Generate JWT token
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
 
@@ -341,6 +351,35 @@ const login = async (req, res) => {
     }
 
     console.log('Login successful for user:', user.email);
+
+    // Get device information for security tracking
+    const userAgent = req.headers['user-agent'] || '';
+    const clientIP = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || 'Unknown';
+    const deviceInfo = getDeviceInfo(userAgent, clientIP);
+    const deviceFingerprint = createDeviceFingerprint(deviceInfo);
+    const location = getLocationFromIP(clientIP);
+
+    // Check if this is a new device
+    const newDevice = isNewDevice(user, deviceFingerprint);
+    
+    if (newDevice) {
+      console.log('New device detected for user:', user.email);
+      
+      // Send new device notification email
+      try {
+        await sendNewDeviceLoginEmail(user.email, user.name, deviceInfo, location);
+        console.log('New device login email sent to:', user.email);
+      } catch (error) {
+        console.error('New device login email sending error:', error);
+        // Don't fail the login if email fails
+      }
+      
+      // Add device to known devices
+      await addKnownDevice(user, deviceInfo, deviceFingerprint);
+    } else {
+      // Update last used time for existing device
+      await updateDeviceLastUsed(user, deviceFingerprint);
+    }
 
     // Update last login time
     user.lastLogin = Date.now();

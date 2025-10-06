@@ -71,6 +71,19 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
+  knownDevices: [{
+    fingerprint: String,
+    browser: String,
+    os: String,
+    firstSeen: {
+      type: Date,
+      default: Date.now
+    },
+    lastUsed: {
+      type: Date,
+      default: Date.now
+    }
+  }],
   createdAt: {
     type: Date,
     default: Date.now

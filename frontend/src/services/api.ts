@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:5000';
+const API_URL = 'http://localhost:5000/api';
 
 // Create an axios instance
 const api = axios.create({
@@ -48,91 +48,91 @@ api.interceptors.response.use(
 export const authService = {
   register: (userData: { name: string; email: string; password: string }) => {
     console.log('API call - register with data:', userData);
-    return api.post('/api/auth/register', userData);
+    return api.post('/auth/register', userData);
   },
-  login: (credentials: { email: string; password: string }) => api.post('/api/auth/login', credentials),
+  login: (credentials: { email: string; password: string }) => api.post('/auth/login', credentials),
   forgotPassword: (data: { email: string }) => {
     console.log('API call - forgot password with email:', data.email);
-    return api.post('/api/auth/forgot-password', data);
+    return api.post('/auth/forgot-password', data);
   },
   verifyResetCode: (data: { email: string; verificationCode: string }) => {
     console.log('API call - verify reset code for email:', data.email);
-    return api.post('/api/auth/verify-reset-code', data);
+    return api.post('/auth/verify-reset-code', data);
   },
   resetPassword: (data: { token: string; newPassword: string; confirmPassword: string }) => {
     console.log('API call - reset password with token:', data.token);
-    return api.post('/api/auth/reset-password', data);
+    return api.post('/auth/reset-password', data);
   },
-  verifyEmail: (data: { userId: string; verificationCode: string }) => api.post('/api/auth/verify-email', data),
-  resendVerification: (data: { userId: string }) => api.post('/api/auth/resend-verification', data),
-  getProfile: () => api.get('/api/profile'),
-  updateProfile: (profileData) => api.put('/api/profile/update', profileData),
+  verifyEmail: (data: { userId: string; verificationCode: string }) => api.post('/auth/verify-email', data),
+  resendVerification: (data: { userId: string }) => api.post('/auth/resend-verification', data),
+  getProfile: () => api.get('/profile'),
+  updateProfile: (profileData) => api.put('/profile/update', profileData),
   uploadProfileImage: (formData) => {
-    return api.post('/api/profile/image', formData);
+    return api.post('/profile/image', formData);
   },
-  testProfileRoute: () => api.get('/api/profile/test'),
-  changePassword: (passwordData) => api.put('/api/profile/change-password', passwordData),
+  testProfileRoute: () => api.get('/profile/test'),
+  changePassword: (passwordData) => api.put('/profile/change-password', passwordData),
 };
 
 // Media services
 export const mediaService = {
   // Get all media files
-  getAllMedia: () => api.get('/api/media'),
+  getAllMedia: () => api.get('/media'),
   
   // Upload media files
-  uploadMedia: (formData, onUploadProgress) => api.post('/api/media/upload', formData, {
+  uploadMedia: (formData, onUploadProgress) => api.post('/media/upload', formData, {
     onUploadProgress
   }),
   
   // Delete media file
-  deleteMedia: (mediaId) => api.delete(`/api/media/${mediaId}`)
+  deleteMedia: (mediaId) => api.delete(`/media/${mediaId}`)
 };
 
 // Schedule services
 export const scheduleService = {
-  createSchedule: (scheduleData) => api.post('/api/schedule', scheduleData),
-  getSchedules: () => api.get('/api/schedule'),
-  getScheduleById: (id) => api.get(`/api/schedule/${id}`),
-  updateSchedule: (id, scheduleData) => api.put(`/api/schedule/${id}`, scheduleData),
-  deleteSchedule: (id) => api.delete(`/api/schedule/${id}`),
+  createSchedule: (scheduleData) => api.post('/schedule', scheduleData),
+  getSchedules: () => api.get('/schedule'),
+  getScheduleById: (id) => api.get(`/schedule/${id}`),
+  updateSchedule: (id, scheduleData) => api.put(`/schedule/${id}`, scheduleData),
+  deleteSchedule: (id) => api.delete(`/schedule/${id}`),
 };
 
 // Ad generation services
 export const adService = {
-  generateAd: (adData) => api.post('/api/ads/generate', adData),
-  getPresets: () => api.get('/api/ads/presets'),
-  getMyAds: (page = 1, limit = 12) => api.get(`/api/ads/my-ads?page=${page}&limit=${limit}`),
-  deleteAd: (id) => api.delete(`/api/ads/${id}`),
+  generateAd: (adData) => api.post('/ads/generate', adData),
+  getPresets: () => api.get('/ads/presets'),
+  getMyAds: (page = 1, limit = 12) => api.get(`/ads/my-ads?page=${page}&limit=${limit}`),
+  deleteAd: (id) => api.delete(`/ads/${id}`),
 };
 
 // Post services for social media
 export const postService = {
   // Post immediately to social media
-  postNow: (postData) => api.post('/api/posts/now', postData),
+  postNow: (postData) => api.post('/posts/now', postData),
   
   // Schedule a post
-  schedulePost: (postData) => api.post('/api/posts/schedule', postData),
+  schedulePost: (postData) => api.post('/posts/schedule', postData),
   
   // Get user's posts with filtering
   getUserPosts: (params = {}) => {
     const query = new URLSearchParams(params).toString();
-    return api.get(`/api/posts${query ? `?${query}` : ''}`);
+    return api.get(`/posts${query ? `?${query}` : ''}`);
   },
   
   // Get scheduled posts
-  getScheduledPosts: () => api.get('/api/posts/scheduled'),
+  getScheduledPosts: () => api.get('/posts/scheduled'),
   
   // Cancel scheduled post
-  cancelScheduledPost: (postId) => api.put(`/api/posts/${postId}/cancel`),
+  cancelScheduledPost: (postId) => api.put(`/posts/${postId}/cancel`),
   
   // Delete post
-  deletePost: (postId) => api.delete(`/api/posts/${postId}`),
+  deletePost: (postId) => api.delete(`/posts/${postId}`),
 
   // Test Instagram posting
-  testInstagramPosting: (testData) => api.post('/api/posts/test/instagram', testData),
+  testInstagramPosting: (testData) => api.post('/posts/test/instagram', testData),
 
   // Test X posting
-  testXPosting: (testData) => api.post('/api/posts/test/x', testData)
+  testXPosting: (testData) => api.post('/posts/test/x', testData)
 };
 
 export default api;
