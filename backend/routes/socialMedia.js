@@ -309,7 +309,7 @@ router.post('/auth/facebook/callback', authenticateToken, async (req, res) => {
               // Don't fail the connection if email fails
             }
           }
-
+        }
       } catch (instagramError) {
         console.error('⚠️  Error processing Instagram account for page', page.id, ':', instagramError.message);
         // Continue processing other pages even if one fails
