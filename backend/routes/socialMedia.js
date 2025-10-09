@@ -260,70 +260,74 @@ router.post('/auth/facebook/callback', authenticateToken, async (req, res) => {
       }
     }
 
-    // Step 5: Handle Instagram business accounts
+    // Step 5: Handle Instagram business accounts using the recommended page/{page_id}/instagram_accounts endpoint
     for (const page of pages) {
-      if (page.instagram_business_account) {
-        try {
-          const instagramResponse = await axios.get(
-            `https://graph.facebook.com/v18.0/${page.instagram_business_account.id}`,
-            {
-              params: {
-                access_token: page.accessToken,
-                fields: 'id,username,profile_picture_url,followers_count,biography'
-              }
-            }
-          );
-
-          const instagramData = instagramResponse.data;
-          
-          // Check if Instagram account already exists
-          const existingInstagram = await SocialAccount.findByPlatformAccountId(
-            req.user.id,
-            'instagram',
-            instagramData.id
-          );
-
-          const instagramAccountData = {
-            userId: req.user.id,
-            platform: 'instagram',
-            accountId: instagramData.id,
-            accountName: instagramData.username,
-            profilePicture: instagramData.profile_picture_url,
-            accessToken: page.accessToken, // Use page token for Instagram API
-            permissions: ['instagram_basic', 'instagram_content_publish'],
-            platformData: {
-              followerCount: instagramData.followers_count || 0,
-              bio: instagramData.biography || '',
-              displayName: instagramData.username,
-              connectedFacebookPageId: page.id,
-              instagramBusinessId: instagramData.id
-            },
-            isActive: true
-          };
-
-          if (existingInstagram) {
-            await SocialAccount.findByIdAndUpdate(existingInstagram._id, instagramAccountData);
-            console.log('🔄 Updated Instagram account:', instagramData.username);
-          } else {
-            await SocialAccount.create(instagramAccountData);
-            console.log('✨ Created Instagram account:', instagramData.username);
-            
-            // Send email notification for new Instagram connection
-            try {
-              const user = await User.findById(req.user.id);
-              if (user) {
-                await notificationService.sendSocialAccountConnectedNotification(req.user.id, 'Instagram', instagramData.username);
-                console.log('📧 Instagram connection email sent to:', user.email);
-              }
-            } catch (emailError) {
-              console.error('📧 Instagram connection email error:', emailError);
-              // Don't fail the connection if email fails
+      try {
+        // Use the recommended endpoint: {page_id}/instagram_accounts
+        const instagramAccountsResponse = await axios.get(
+          `https://graph.facebook.com/v18.0/${page.id}/instagram_accounts`,
+          {
+            params: {
+              access_token: page.accessToken,
+              fields: 'id,username,profile_picture_url,followers_count,biography'
             }
           }
+        );
 
-        } catch (instagramError) {
-          console.error('⚠️  Error processing Instagram account:', instagramError.message);
+        const instagramAccounts = instagramAccountsResponse.data.data;
+        
+        // Process each Instagram account connected to this page
+        for (const instagramData of instagramAccounts) {
+          
+        // Check if Instagram account already exists
+        const existingInstagram = await SocialAccount.findByPlatformAccountId(
+          req.user.id,
+          'instagram',
+          instagramData.id
+        );
+
+        const instagramAccountData = {
+          userId: req.user.id,
+          platform: 'instagram',
+          accountId: instagramData.id,
+          accountName: instagramData.username,
+          profilePicture: instagramData.profile_picture_url,
+          accessToken: page.accessToken, // Use page token for Instagram API
+          permissions: ['instagram_basic', 'instagram_content_publish'],
+          platformData: {
+            followerCount: instagramData.followers_count || 0,
+            bio: instagramData.biography || '',
+            displayName: instagramData.username,
+            connectedFacebookPageId: page.id,
+            instagramBusinessId: instagramData.id
+          },
+          isActive: true
+        };
+
+        if (existingInstagram) {
+          await SocialAccount.findByIdAndUpdate(existingInstagram._id, instagramAccountData);
+          console.log('🔄 Updated Instagram account:', instagramData.username);
+        } else {
+          await SocialAccount.create(instagramAccountData);
+          console.log('✨ Created Instagram account:', instagramData.username);
+          
+          // Send email notification for new Instagram connection
+          try {
+            const user = await User.findById(req.user.id);
+            if (user) {
+              await notificationService.sendSocialAccountConnectedNotification(req.user.id, 'Instagram', instagramData.username);
+              console.log('📧 Instagram connection email sent to:', user.email);
+            }
+          } catch (emailError) {
+            console.error('📧 Instagram connection email error:', emailError);
+            // Don't fail the connection if email fails
+          }
         }
+        }
+
+      } catch (instagramError) {
+        console.error('⚠️  Error processing Instagram account for page', page.id, ':', instagramError.message);
+        // Continue processing other pages even if one fails
       }
     }
 
@@ -997,6 +1001,219 @@ router.delete('/accounts/cleanup', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Cleanup accounts error:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Instagram OAuth initiation - Separate route for Instagram Business accounts
+router.get('/auth/instagram', authenticateToken, async (req, res) => {
+  try {
+    const scopes = [
+      'pages_manage_posts',
+      'pages_read_engagement', 
+      'pages_show_list',
+      'pages_manage_metadata',
+      'pages_read_user_content',
+      'instagram_basic',
+      'instagram_content_publish',
+      'instagram_manage_insights',
+      'business_management'
+    ].join(',');
+
+    // Use the backend callback URL - Facebook should redirect here first
+    const backendRedirectUri = process.env.BASE_URL + '/api/social-media/callback/instagram';
+
+    const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?` +
+      `client_id=${FACEBOOK_APP_ID}&` +
+      `redirect_uri=${encodeURIComponent(backendRedirectUri)}&` +
+      `scope=${encodeURIComponent(scopes)}&` +
+      `response_type=code&` +
+      `state=${req.user.id}`;
+
+    console.log('Instagram Auth URL:', authUrl);
+    console.log('Redirect URI:', backendRedirectUri);
+
+    res.json({ authUrl });
+  } catch (error) {
+    console.error('Instagram auth initiation error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Instagram specific callback route
+router.get('/callback/instagram', async (req, res) => {
+  try {
+    const { code, state, error } = req.query;
+    
+    console.log('Instagram callback received:', { code: !!code, state, error });
+    
+    if (error) {
+      return res.redirect(`${process.env.CLIENT_URL}/auth/callback?error=${encodeURIComponent(error)}&platform=instagram`);
+    }
+    
+    if (!code) {
+      return res.redirect(`${process.env.CLIENT_URL}/auth/callback?error=no_code&platform=instagram`);
+    }
+    
+    // Redirect to frontend auth callback with the code and platform info
+    const redirectUrl = `${process.env.CLIENT_URL}/auth/callback?code=${code}&state=${state}&platform=instagram`;
+    console.log('Redirecting to frontend auth callback:', redirectUrl);
+    
+    res.redirect(redirectUrl);
+  } catch (error) {
+    console.error('Instagram OAuth callback error:', error);
+    res.redirect(`${process.env.CLIENT_URL}/auth/callback?error=callback_error&platform=instagram`);
+  }
+});
+
+// Instagram OAuth callback processing - Focused on Instagram via Pages
+router.post('/auth/instagram/callback', authenticateToken, async (req, res) => {
+  try {
+    const { code } = req.body;
+    
+    if (!code) {
+      return res.status(400).json({ error: 'Authorization code is required' });
+    }
+
+    console.log('🔗 Instagram OAuth - Starting authentication');
+    
+    const backendRedirectUri = process.env.BASE_URL + '/api/social-media/callback/instagram';
+
+    // Step 1: Exchange code for access token
+    const tokenResponse = await axios.get(`https://graph.facebook.com/v18.0/oauth/access_token`, {
+      params: {
+        client_id: FACEBOOK_APP_ID,
+        client_secret: FACEBOOK_APP_SECRET,
+        redirect_uri: backendRedirectUri,
+        code: code
+      }
+    });
+
+    const { access_token } = tokenResponse.data;
+    console.log('✅ Instagram access token received');
+
+    // Step 2: Get Facebook user info
+    const userResponse = await axios.get(`https://graph.facebook.com/v18.0/me`, {
+      params: {
+        access_token: access_token,
+        fields: 'id,name,email,picture'
+      }
+    });
+
+    const facebookUser = userResponse.data;
+    console.log('👤 Facebook user:', facebookUser.name);
+
+    // Step 3: Get Facebook pages with Instagram accounts
+    const pagesResponse = await axios.get(`https://graph.facebook.com/v18.0/me/accounts`, {
+      params: {
+        access_token: access_token,
+        fields: 'id,name,access_token,picture,fan_count,category'
+      }
+    });
+
+    const pages = pagesResponse.data.data;
+    console.log(`📄 Found ${pages.length} Facebook pages`);
+
+    let instagramAccountsCreated = 0;
+    let instagramAccountsUpdated = 0;
+
+    // Step 4: Process each page and check for Instagram accounts
+    for (const page of pages) {
+      try {
+        // Use the recommended endpoint: {page_id}/instagram_accounts
+        const instagramAccountsResponse = await axios.get(
+          `https://graph.facebook.com/v18.0/${page.id}/instagram_accounts`,
+          {
+            params: {
+              access_token: page.access_token,
+              fields: 'id,username,profile_picture_url,followers_count,biography'
+            }
+          }
+        );
+
+        const instagramAccounts = instagramAccountsResponse.data.data;
+        
+        // Process each Instagram account connected to this page
+        for (const instagramData of instagramAccounts) {
+          // Check if Instagram account already exists
+          const existingInstagram = await SocialAccount.findByPlatformAccountId(
+            req.user.id,
+            'instagram',
+            instagramData.id
+          );
+
+          const instagramAccountData = {
+            userId: req.user.id,
+            platform: 'instagram',
+            accountId: instagramData.id,
+            accountName: instagramData.username,
+            profilePicture: instagramData.profile_picture_url,
+            accessToken: page.access_token, // Use page token for Instagram API
+            permissions: ['instagram_basic', 'instagram_content_publish'],
+            platformData: {
+              followerCount: instagramData.followers_count || 0,
+              bio: instagramData.biography || '',
+              displayName: instagramData.username,
+              connectedFacebookPageId: page.id,
+              instagramBusinessId: instagramData.id
+            },
+            isActive: true
+          };
+
+          if (existingInstagram) {
+            await SocialAccount.findByIdAndUpdate(existingInstagram._id, instagramAccountData);
+            console.log('🔄 Updated Instagram account:', instagramData.username);
+            instagramAccountsUpdated++;
+          } else {
+            await SocialAccount.create(instagramAccountData);
+            console.log('✨ Created Instagram account:', instagramData.username);
+            instagramAccountsCreated++;
+            
+            // Send email notification for new Instagram connection
+            try {
+              const user = await User.findById(req.user.id);
+              if (user) {
+                await notificationService.sendSocialAccountConnectedNotification(req.user.id, 'Instagram', instagramData.username);
+                console.log('📧 Instagram connection email sent to:', user.email);
+              }
+            } catch (emailError) {
+              console.error('📧 Instagram connection email error:', emailError);
+              // Don't fail the connection if email fails
+            }
+          }
+        }
+
+      } catch (pageInstagramError) {
+        console.error('⚠️  Error processing Instagram accounts for page', page.id, ':', pageInstagramError.message);
+        // Continue processing other pages even if one fails
+      }
+    }
+
+    // Step 5: Return all user's accounts
+    const allAccounts = await SocialAccount.findUserAccounts(req.user.id);
+
+    res.json({ 
+      success: true, 
+      message: `Instagram connected! Created: ${instagramAccountsCreated}, Updated: ${instagramAccountsUpdated}`,
+      accounts: allAccounts,
+      instagramStats: {
+        created: instagramAccountsCreated,
+        updated: instagramAccountsUpdated,
+        pagesProcessed: pages.length
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Instagram auth error:', error.response?.data || error.message);
+    
+    let errorMessage = 'Instagram authentication failed';
+    if (error.response?.data?.error?.message) {
+      errorMessage = error.response.data.error.message;
+    }
+
+    res.status(500).json({ 
+      error: errorMessage,
+      details: error.response?.data || error.message
+    });
   }
 });
 

@@ -92,7 +92,7 @@ export default function AuthCallback() {
           return;
         }
         
-        // Otherwise redirect to dashboard
+        // Otherwise redirect to link accounts page (not dashboard)
         setTimeout(() => {
           navigate('/dashboard/link-accounts', { replace: true });
         }, 2000);

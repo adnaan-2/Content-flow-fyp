@@ -128,15 +128,12 @@ app.use('/api/subscription', subscriptionRoutes);
 const postRoutes = require('./routes/postRoutes');
 app.use('/api/posts', postRoutes);
 
-<<<<<<< HEAD
 // Add notification routes
 const notificationRoutes = require('./routes/notificationRoutes');
 app.use('/api/notifications', notificationRoutes);
-=======
 // Schedule routes
 const scheduleRoutes = require('./routes/scheduleRoutes');
 app.use('/api/schedule', scheduleRoutes);
->>>>>>> 2ab531d7aac68495525fd758bcb25617218ecab9
 
 // Serve static assets in production
 if (process.env.NODE_ENV === 'production') {

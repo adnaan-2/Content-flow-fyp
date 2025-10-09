@@ -93,6 +93,57 @@ export default function LinkAccounts() {
   useEffect(() => {
     fetchConnectedAccounts();
     
+    // Listen for messages from popup windows
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      
+      const { type, platform, account, accounts, error } = event.data;
+      
+      console.log('📨 Received message from popup:', { type, platform, account: !!account, accounts: !!accounts });
+      
+      if (type === 'AUTH_SUCCESS') {
+        // Show success message
+        setSuccessMessage(`${platform} account connected successfully!`);
+        setShowSuccess(true);
+        
+        // Update accounts immediately
+        if (accounts && Array.isArray(accounts)) {
+          console.log('🔄 Updating all accounts from message');
+          setConnectedAccounts(accounts);
+        } else if (account) {
+          console.log('🔄 Adding single account from message');
+          setConnectedAccounts(prev => {
+            const filtered = prev.filter(acc => acc.platform !== platform);
+            return [...filtered, account];
+          });
+        } else {
+          console.log('🔄 Refreshing accounts from server');
+          fetchConnectedAccounts();
+        }
+        
+        // Auto-hide success message
+        setTimeout(() => setShowSuccess(false), 5000);
+        
+        // Reset connecting state
+        setConnectingPlatform(null);
+        setLoading(false);
+      } else if (type === 'AUTH_ERROR') {
+        console.error(`${platform} connection failed:`, error);
+        setErrorMessage(`Failed to connect ${platform}: ${error}`);
+        setShowError(true);
+        
+        // Auto-hide error message
+        setTimeout(() => setShowError(false), 5000);
+        
+        // Reset connecting state
+        setConnectingPlatform(null);
+        setLoading(false);
+      }
+    };
+    
+    // Add message listener
+    window.addEventListener('message', handleMessage);
+    
     // Listen for localStorage changes (fallback for CORS issues)
     const handleStorageChange = () => {
       const authResult = localStorage.getItem('auth_result');
@@ -101,7 +152,6 @@ export default function LinkAccounts() {
           const result = JSON.parse(authResult);
           // Only process if it's recent (within last 30 seconds)
           if (Date.now() - result.timestamp < 30000) {
-
             
             if (result.type === 'AUTH_SUCCESS') {
               setSuccessMessage(`${result.platform} account connected successfully!`);
@@ -135,9 +185,17 @@ export default function LinkAccounts() {
     // Also check periodically in case storage event doesn't fire
     const interval = setInterval(handleStorageChange, 2000);
     
+    // Auto-refresh accounts every 30 seconds
+    const refreshInterval = setInterval(() => {
+      console.log('🔄 Auto-refreshing accounts...');
+      fetchConnectedAccounts();
+    }, 30000);
+    
     return () => {
+      window.removeEventListener('message', handleMessage);
       window.removeEventListener('storage', handleStorageChange);
       clearInterval(interval);
+      clearInterval(refreshInterval);
     };
   }, []);
 
@@ -217,19 +275,96 @@ export default function LinkAccounts() {
             'width=600,height=700,scrollbars=yes,resizable=yes,noopener=no,noreferrer=no'
           );
 
+          if (!popup) {
+            setErrorMessage('Please allow popups for this site to connect your accounts.');
+            setShowError(true);
+            setLoading(false);
+            setConnectingPlatform(null);
+            return;
+          }
+
+          // Enhanced popup monitoring with better message handling
+          const handleMessage = (event: MessageEvent) => {
+            if (event.origin !== window.location.origin) return;
+            
+            const { type, platform: messagePlatform, message, account, accounts, error } = event.data;
+            
+            // Only handle messages for the current platform
+            if (messagePlatform !== platform) return;
+            
+            console.log(`📨 Received ${type} message for ${platform}:`, { message, account: !!account, accounts: !!accounts });
+            
+            if (type === 'AUTH_SUCCESS') {
+              // Close popup immediately
+              if (popup && !popup.closed) {
+                popup.close();
+              }
+              
+              // Show success notification
+              setSuccessMessage(`${platform} account connected successfully!`);
+              setShowSuccess(true);
+              
+              // Update accounts immediately
+              if (accounts && Array.isArray(accounts)) {
+                console.log('🔄 Updating all accounts from popup message');
+                setConnectedAccounts(accounts);
+              } else if (account) {
+                console.log('🔄 Adding single account from popup message');
+                setConnectedAccounts(prev => {
+                  const filtered = prev.filter(acc => acc.platform !== platform);
+                  return [...filtered, account];
+                });
+              } else {
+                console.log('🔄 Refreshing accounts from server after success');
+                fetchConnectedAccounts();
+              }
+              
+              // Auto-hide success message after 5 seconds
+              setTimeout(() => setShowSuccess(false), 5000);
+              
+              // Cleanup
+              cleanup();
+              
+            } else if (type === 'AUTH_ERROR') {
+              // Close popup immediately
+              if (popup && !popup.closed) {
+                popup.close();
+              }
+              
+              console.error(`${platform} connection failed:`, error);
+              setErrorMessage(`Failed to connect ${platform}: ${error}`);
+              setShowError(true);
+              
+              // Auto-hide error message after 5 seconds
+              setTimeout(() => setShowError(false), 5000);
+              
+              // Cleanup
+              cleanup();
+            }
+          };
+
+          const cleanup = () => {
+            window.removeEventListener('message', handleMessage);
+            if (pollTimer) clearInterval(pollTimer);
+            if (checkClosed) clearInterval(checkClosed);
+            setConnectingPlatform(null);
+            setLoading(false);
+          };
+
+          // Listen for popup messages
+          window.addEventListener('message', handleMessage);
+
           // Polling method as fallback for Cross-Origin-Opener-Policy issues
           let pollTimer: NodeJS.Timeout | null = null;
           
           const pollPopup = () => {
             try {
               if (popup?.closed) {
-                if (pollTimer) clearInterval(pollTimer);
-                console.log('Popup was closed, refreshing accounts...');
+                console.log(`${platform} popup was closed, refreshing accounts...`);
                 // Wait a moment and then refresh accounts
                 setTimeout(() => {
                   fetchConnectedAccounts();
-                  setConnectingPlatform(null);
-                  setLoading(false);
+                  cleanup();
                 }, 1000);
                 return;
               }
@@ -240,11 +375,9 @@ export default function LinkAccounts() {
                 if (popupUrl && popupUrl.includes('/auth/callback')) {
                   console.log('Detected callback URL, refreshing accounts...');
                   popup?.close();
-                  if (pollTimer) clearInterval(pollTimer);
                   setTimeout(() => {
                     fetchConnectedAccounts();
-                    setConnectingPlatform(null);
-                    setLoading(false);
+                    cleanup();
                   }, 1000);
                 }
               } catch (e) {
@@ -258,76 +391,11 @@ export default function LinkAccounts() {
           // Start polling every 1 second
           pollTimer = setInterval(pollPopup, 1000);
 
-          // Listen for popup messages (backup method)
-          const handleMessage = (event: MessageEvent) => {
-            if (event.origin !== window.location.origin) return;
-            
-            const { type, platform, message, account, accounts, error } = event.data;
-            
-            if (type === 'AUTH_SUCCESS') {
-              // CRITICAL: Stop popup monitoring and cleanup
-              if (pollTimer) clearInterval(pollTimer);
-              window.removeEventListener('message', handleMessage);
-              
-              // Close the popup window
-              if (popup && !popup.closed) {
-                popup.close();
-              }
-              
-              // Show success notification
-              setSuccessMessage(`${platform} account connected successfully!`);
-              setShowSuccess(true);
-              
-              // If multiple accounts are provided (like Facebook + pages), update all at once
-              if (accounts && Array.isArray(accounts)) {
-                setConnectedAccounts(accounts);
-              } else if (account) {
-                // Single account update
-                setConnectedAccounts(prev => {
-                  const filtered = prev.filter(acc => acc.platform !== platform);
-                  return [...filtered, account];
-                });
-              } else {
-                // Fallback: refresh all accounts from server
-                fetchConnectedAccounts();
-              }
-              
-              // Auto-hide success message after 3 seconds
-              setTimeout(() => setShowSuccess(false), 3000);
-              
-            } else if (type === 'AUTH_ERROR') {
-              // CRITICAL: Stop popup monitoring and cleanup
-              if (pollTimer) clearInterval(pollTimer);
-              window.removeEventListener('message', handleMessage);
-              
-              // Close the popup window
-              if (popup && !popup.closed) {
-                popup.close();
-              }
-              
-              console.error(`${platform} connection failed:`, error);
-              setErrorMessage(`Failed to connect ${platform}: ${error}`);
-              setShowError(true);
-              
-              // Auto-hide error message after 5 seconds
-              setTimeout(() => setShowError(false), 5000);
-            }
-            
-            // Reset state after handling success/error
-            setConnectingPlatform(null);
-            setLoading(false);
-          };
-
-
-          window.addEventListener('message', handleMessage);
-
           // Enhanced popup monitoring
           const checkClosed = setInterval(() => {
             if (popup?.closed) {
+              console.log(`${platform} popup closed, cleaning up...`);
               clearInterval(checkClosed);
-              setLoading(false);
-              setConnectingPlatform(null);
-              window.removeEventListener('message', handleMessage);
               
               // Refresh accounts after potential connection
               setTimeout(() => {
@@ -336,18 +404,17 @@ export default function LinkAccounts() {
                 setShowSuccess(true);
                 setTimeout(() => setShowSuccess(false), 3000);
               }, 1500);
+              
+              cleanup();
             }
           }, 1000);
 
           // Cleanup after 5 minutes
           setTimeout(() => {
-            clearInterval(checkClosed);
-            window.removeEventListener('message', handleMessage);
+            cleanup();
             if (!popup?.closed) {
               popup?.close();
             }
-            setLoading(false);
-            setConnectingPlatform(null);
           }, 300000);
         }
       } else {
@@ -610,12 +677,47 @@ export default function LinkAccounts() {
                                   />
                                 )}
                                 <div className="flex-1">
-                                  <h4 className="font-medium text-white">
-                                    {account.accountName}
-                                  </h4>
+                                  <div className="flex items-center space-x-2">
+                                    <h4 className="font-medium text-white">
+                                      {account.accountName}
+                                    </h4>
+                                    {/* Real-time status indicator */}
+                                    <div className={`w-2 h-2 rounded-full ${
+                                      account.isActive ? 'bg-green-500' : 'bg-red-500'
+                                    }`} title={account.isActive ? 'Connected' : 'Disconnected'}></div>
+                                  </div>
+                                  <p className="text-gray-400 text-sm capitalize">
+                                    {account.platform} Account
+                                  </p>
+                                  {account.email && (
+                                    <p className="text-gray-500 text-xs mt-1">
+                                      {account.email}
+                                    </p>
+                                  )}
                                   {account.platformData?.followerCount !== undefined && (
                                     <p className="text-gray-400 text-sm mt-1">
                                       {account.platformData.followerCount.toLocaleString()} followers
+                                    </p>
+                                  )}
+                                  {/* Additional platform-specific info */}
+                                  {account.platform === 'instagram' && account.platformData?.connectedFacebookPageId && (
+                                    <p className="text-blue-400 text-xs mt-1">
+                                      Connected via Facebook Page
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="text-right">
+                                  {/* Connection status badge */}
+                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                    account.isActive 
+                                      ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+                                      : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                  }`}>
+                                    {account.isActive ? 'Connected' : 'Disconnected'}
+                                  </span>
+                                  {account.platform === 'instagram' && account.platformData?.instagramBusinessId && (
+                                    <p className="text-xs text-gray-500 mt-1">
+                                      Business Account
                                     </p>
                                   )}
                                 </div>

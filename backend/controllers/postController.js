@@ -870,7 +870,6 @@ const postNow = async (req, res) => {
   }
 };
 
-<<<<<<< HEAD
 // Schedule a post
 const schedulePost = async (req, res) => {
   try {
@@ -1047,8 +1046,6 @@ const schedulePost = async (req, res) => {
   }
 };
 
-=======
->>>>>>> 2ab531d7aac68495525fd758bcb25617218ecab9
 // Get user's posts
 const getUserPosts = async (req, res) => {
   try {
