@@ -288,18 +288,18 @@ const GenerateAds = () => {
   };
 
   return (
-    <div className="h-[85vh] bg-black text-gray-100 flex flex-col relative">
-      {/* Simple Dark Background */}
-      <div className="absolute inset-0 bg-black">
+    <div className="h-[85vh] bg-gray-50 dark:bg-black text-gray-900 dark:text-gray-100 flex flex-col relative">
+      {/* Background */}
+      <div className="absolute inset-0 bg-gray-50 dark:bg-black">
         <div className="absolute top-0 left-0 w-full h-full overflow-hidden">
-          <div className="absolute top-20 left-20 w-48 h-48 bg-gray-800/20 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-20 right-20 w-64 h-64 bg-gray-700/15 rounded-full blur-3xl"></div>
+          <div className="absolute top-20 left-20 w-48 h-48 bg-gray-200/30 dark:bg-gray-800/20 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-20 right-20 w-64 h-64 bg-gray-300/20 dark:bg-gray-700/15 rounded-full blur-3xl"></div>
         </div>
       </div>
 
       {/* Error/Success Messages */}
       {error && (
-        <Alert className="mx-auto max-w-4xl mx-4 my-1 bg-red-900/30 text-red-300 border border-red-600/40 relative z-10 flex-shrink-0">
+        <Alert className="mx-auto max-w-4xl mx-4 my-1 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-600/40 relative z-10 flex-shrink-0">
           <AlertDescription className="flex items-center gap-2 text-sm">
             <span>⚠️</span>
             {error}
@@ -308,7 +308,7 @@ const GenerateAds = () => {
       )}
       
       {success && (
-        <Alert className="mx-auto max-w-4xl mx-4 my-1 bg-green-900/30 text-green-300 border border-green-600/40 relative z-10 flex-shrink-0">
+        <Alert className="mx-auto max-w-4xl mx-4 my-1 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-600/40 relative z-10 flex-shrink-0">
           <AlertDescription className="flex items-center gap-2 text-sm">
             <span>🎉</span>
             {success}
@@ -348,7 +348,7 @@ const GenerateAds = () => {
                   <img
                     src={generatedImage.imageUrl}
                     alt="Generated Ad"
-                    className="max-w-md max-h-80 object-contain rounded-xl border border-gray-600 shadow-2xl"
+                    className="max-w-md max-h-80 object-contain rounded-xl border border-gray-300 dark:border-gray-600 shadow-2xl"
                   />
                 </div>
                 
@@ -364,7 +364,7 @@ const GenerateAds = () => {
                     variant="outline" 
                     onClick={handleGenerate}
                     disabled={isGenerating}
-                    className="bg-background border-primary/20 text-foreground hover:bg-primary/10 hover:text-foreground px-6 py-3 rounded-xl text-sm font-medium transition-all flex items-center gap-2"
+                    className="bg-white dark:bg-background border-gray-300 dark:border-primary/20 text-gray-900 dark:text-foreground hover:bg-gray-50 dark:hover:bg-primary/10 hover:text-gray-900 dark:hover:text-foreground px-6 py-3 rounded-xl text-sm font-medium transition-all flex items-center gap-2"
                   >
                     <Sparkles className="h-4 w-4" />
                     Regenerate
@@ -381,15 +381,15 @@ const GenerateAds = () => {
                     "Generate Stunning Content",
                     "Bring Your Vision to Life"
                   ]}
-                  className="text-5xl font-black text-white mb-2"
+                  className="text-5xl font-black text-gray-900 dark:text-white mb-2"
                   typingSpeed={60}
                   deletingSpeed={40}
                   pauseDuration={1500}
                   loop={true}
                   showCursor={true}
                   cursorCharacter="|"
-                  cursorClassName="text-white text-6xl animate-pulse font-black"
-                  textColors={['#ffffff', '#ffffff', '#ffffff', '#ffffff', '#ffffff']}
+                  cursorClassName="text-gray-900 dark:text-white text-6xl animate-pulse font-black"
+                  textColors={['#111827', '#111827', '#111827', '#111827', '#111827']}
                 />
               </div>
             )}
@@ -398,14 +398,14 @@ const GenerateAds = () => {
           {/* Bottom Search Bar Section */}
           <div className="flex-shrink-0 p-2">
             <div className="w-full max-w-4xl mx-auto">
-              <div className="bg-black border border-gray-800 rounded-lg p-3">
+              <div className="bg-white dark:bg-black border border-gray-300 dark:border-gray-800 rounded-lg p-3">
                 <div className="flex items-center gap-3">
                 {/* Design Category Button */}
                 <div className="relative dropdown-container">
                   <Button
                     variant="outline"
                     size="sm"
-                    className={`flex items-center gap-2 h-10 px-4 bg-black border-gray-700 hover:bg-gray-900 text-gray-300 text-sm rounded-lg transition-all ${
+                    className={`flex items-center gap-2 h-10 px-4 bg-gray-50 dark:bg-black border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-900 text-gray-700 dark:text-gray-300 text-sm rounded-lg transition-all ${
                       selectedCategory ? "bg-primary/10 text-foreground border-primary" : ""
                     }`}
                     onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
@@ -430,7 +430,7 @@ const GenerateAds = () => {
                   </Button>
                   
                   {showCategoryDropdown && (
-                    <div className="absolute bottom-12 left-0 bg-black border border-gray-700 rounded-lg p-3 z-50 min-w-[240px] shadow-xl" style={{ scrollbarWidth: 'thin', scrollbarColor: '#374151 transparent' }}>
+                    <div className="absolute bottom-12 left-0 bg-white dark:bg-black border border-gray-200 dark:border-gray-700 rounded-lg p-3 z-50 min-w-[240px] shadow-xl" style={{ scrollbarWidth: 'thin', scrollbarColor: '#374151 transparent' }}>
                       <div className="grid grid-cols-2 gap-1">
                         {categories.map((category) => {
                           const IconComponent = category.icon;
@@ -439,17 +439,17 @@ const GenerateAds = () => {
                               key={category.id}
                               variant="ghost"
                               size="sm"
-                              className={`h-10 flex flex-col items-center gap-1 rounded-lg hover:bg-gray-900 text-sm transition-all ${
+                              className={`h-10 flex flex-col items-center gap-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900 text-sm transition-all ${
                                 selectedCategory === category.id 
                                   ? "bg-primary text-primary-foreground" 
-                                  : "text-muted-foreground hover:text-foreground"
+                                  : "text-gray-600 dark:text-muted-foreground hover:text-gray-900 dark:hover:text-foreground"
                               }`}
                               onClick={() => {
                                 setSelectedCategory(category.id);
                                 setShowCategoryDropdown(false);
                               }}
                             >
-                              <div className={`p-1 rounded-sm ${selectedCategory === category.id ? "bg-white/20" : "bg-gray-800"}`}>
+                              <div className={`p-1 rounded-sm ${selectedCategory === category.id ? "bg-white/20" : "bg-gray-200 dark:bg-gray-800"}`}>
                                 <IconComponent className="h-3 w-3" />
                               </div>
                               <span className="text-xs font-medium">{category.name.split(' ')[0]}</span>
@@ -466,12 +466,12 @@ const GenerateAds = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    className={`flex items-center gap-2 h-10 px-4 bg-black border-gray-700 hover:bg-gray-900 text-gray-300 text-sm rounded-lg transition-all ${
+                    className={`flex items-center gap-2 h-10 px-4 bg-gray-50 dark:bg-black border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-900 text-gray-700 dark:text-gray-300 text-sm rounded-lg transition-all ${
                       selectedSize ? "bg-primary/10 text-foreground border-primary" : ""
                     }`}
                     onClick={() => setShowRatioDropdown(!showRatioDropdown)}
                   >
-                    <div className="border border-gray-400 rounded bg-gray-600" 
+                    <div className="border border-gray-400 dark:border-gray-400 rounded bg-gray-400 dark:bg-gray-600" 
                          style={{ 
                            width: selectedSize ? 
                              (sizes.find(s => s.id === selectedSize)?.ratio === '1:1' ? '10px' : 
@@ -487,17 +487,17 @@ const GenerateAds = () => {
                   </Button>
                   
                   {showRatioDropdown && (
-                    <div className="absolute bottom-12 left-0 bg-black border border-gray-700 rounded-lg p-3 z-50 min-w-[160px] shadow-xl" style={{ scrollbarWidth: 'thin', scrollbarColor: '#374151 transparent' }}>
+                    <div className="absolute bottom-12 left-0 bg-white dark:bg-black border border-gray-200 dark:border-gray-700 rounded-lg p-3 z-50 min-w-[160px] shadow-xl" style={{ scrollbarWidth: 'thin', scrollbarColor: '#374151 transparent' }}>
                       <div className="space-y-1">
                         {sizes.map((size) => (
                           <Button
                             key={size.id}
                             variant="ghost"
                             size="sm"
-                            className={`w-full flex items-center gap-2 justify-start h-8 rounded-md hover:bg-gray-700 text-xs ${
+                            className={`w-full flex items-center gap-2 justify-start h-8 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-xs ${
                               selectedSize === size.id 
-                                ? "bg-gray-700 text-gray-200" 
-                                : "text-gray-400 hover:text-gray-200"
+                                ? "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200" 
+                                : "text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
                             }`}
                             onClick={() => {
                               setSelectedSize(size.id);
@@ -528,7 +528,7 @@ const GenerateAds = () => {
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
                     rows={1}
-                    className="w-full min-h-[40px] bg-black border border-gray-700 text-white placeholder-gray-400 resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base rounded-lg px-4 py-3 pr-20"
+                    className="w-full min-h-[40px] bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base rounded-lg px-4 py-3 pr-20"
                     style={{ scrollbarWidth: 'thin', scrollbarColor: '#374151 transparent' }}
                     onInput={(e) => {
                       const target = e.target as HTMLTextAreaElement;
@@ -563,13 +563,13 @@ const GenerateAds = () => {
         </div>
 
         {/* Right Sidebar - Design History */}
-        <div className="w-64 flex flex-col border-l border-gray-800 bg-black">
-          <div className="p-4 border-b border-gray-800">
+        <div className="w-64 flex flex-col border-l border-gray-300 dark:border-gray-800 bg-white dark:bg-black">
+          <div className="p-4 border-b border-gray-300 dark:border-gray-800">
             <div className="flex items-center gap-2 mb-2">
-              <div className="w-4 h-4 bg-gray-700 rounded-sm flex items-center justify-center">
-                <ImageIcon className="h-2 w-2 text-gray-400" />
+              <div className="w-4 h-4 bg-gray-300 dark:bg-gray-700 rounded-sm flex items-center justify-center">
+                <ImageIcon className="h-2 w-2 text-gray-600 dark:text-gray-400" />
               </div>
-              <h3 className="text-xl font-medium text-white">History</h3>
+              <h3 className="text-xl font-medium text-gray-900 dark:text-white">History</h3>
             </div>
         
           </div>
@@ -577,16 +577,16 @@ const GenerateAds = () => {
           <div className="flex-1 overflow-hidden p-2">
             {adsLoading ? (
               <div className="flex flex-col items-center justify-center py-4">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mb-1"></div>
-                <span className="text-xs text-gray-500">Loading...</span>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400 dark:border-gray-600 mb-1"></div>
+                <span className="text-xs text-gray-500 dark:text-gray-500">Loading...</span>
               </div>
             ) : myAds.length === 0 ? (
               <div className="text-center py-4">
                 <div className="mx-auto w-8 h-8 mb-2">
-                  <ImageIcon className="h-8 w-8 text-gray-600" />
+                  <ImageIcon className="h-8 w-8 text-gray-500 dark:text-gray-600" />
                 </div>
-                <p className="text-gray-500 text-xs mb-1">No designs yet</p>
-                <p className="text-gray-600 text-xs">Create your first ad</p>
+                <p className="text-gray-600 dark:text-gray-500 text-xs mb-1">No designs yet</p>
+                <p className="text-gray-500 dark:text-gray-600 text-xs">Create your first ad</p>
               </div>
             ) : (
               <div 
@@ -605,19 +605,19 @@ const GenerateAds = () => {
                       <img
                         src={ad.url}
                         alt={ad.prompt}
-                        className="w-full h-full object-cover rounded-lg border border-gray-600"
+                        className="w-full h-full object-cover rounded-lg border border-gray-300 dark:border-gray-600"
                       />
                       <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
                         <div className="flex gap-1">
                           <Dialog>
                             <DialogTrigger asChild>
-                              <Button size="sm" className="h-6 w-6 p-0 bg-gray-700 hover:bg-gray-600 border-0 text-xs">
+                              <Button size="sm" className="h-6 w-6 p-0 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 border-0 text-xs">
                                 <Eye className="h-3 w-3" />
                               </Button>
                             </DialogTrigger>
-                            <DialogContent className="max-w-2xl bg-gray-800 border border-gray-600">
+                            <DialogContent className="max-w-2xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600">
                               <DialogHeader>
-                                <DialogTitle className="flex items-center gap-2 text-gray-300">
+                                <DialogTitle className="flex items-center gap-2 text-gray-900 dark:text-gray-300">
                                   <ImageIcon className="h-4 w-4" />
                                   Generated Design
                                 </DialogTitle>
@@ -626,11 +626,11 @@ const GenerateAds = () => {
                                 <img
                                   src={ad.url}
                                   alt={ad.prompt}
-                                  className="w-full max-h-[50vh] object-contain rounded-lg border border-gray-600"
+                                  className="w-full max-h-[50vh] object-contain rounded-lg border border-gray-300 dark:border-gray-600"
                                 />
-                                <div className="bg-black p-3 rounded-lg border border-gray-800">
-                                  <strong className="text-gray-300 text-xs">Prompt:</strong>
-                                  <p className="mt-1 text-xs text-gray-400">{ad.prompt}</p>
+                                <div className="bg-gray-50 dark:bg-black p-3 rounded-lg border border-gray-200 dark:border-gray-800">
+                                  <strong className="text-gray-700 dark:text-gray-300 text-xs">Prompt:</strong>
+                                  <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">{ad.prompt}</p>
                                 </div>
                               </div>
                             </DialogContent>
@@ -639,7 +639,7 @@ const GenerateAds = () => {
                           <Button 
                             size="sm" 
                             onClick={() => handleDownloadAd(ad)}
-                            className="h-6 w-6 p-0 bg-gray-700 hover:bg-gray-600 border-0 text-xs"
+                            className="h-6 w-6 p-0 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 border-0 text-xs"
                           >
                             <Download className="h-3 w-3" />
                           </Button>
@@ -647,13 +647,13 @@ const GenerateAds = () => {
                           <Button 
                             size="sm" 
                             onClick={() => handleDeleteAd(ad._id)}
-                            className="h-6 w-6 p-0 bg-gray-700 hover:bg-gray-600 border-0 text-xs"
+                            className="h-6 w-6 p-0 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 border-0 text-xs"
                           >
                             <Trash2 className="h-3 w-3" />
                           </Button>
                         </div>
                       </div>
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/80 text-white p-1 rounded-b-lg">
+                      <div className="absolute bottom-0 left-0 right-0 bg-white/90 dark:bg-black/80 text-gray-900 dark:text-white p-1 rounded-b-lg">
                         <p className="text-xs truncate">{ad.prompt}</p>
                       </div>
                     </div>
@@ -661,7 +661,7 @@ const GenerateAds = () => {
                 </div>
                 {myAds.length > 12 && (
                   <div className="text-center mt-2">
-                    <p className="text-xs text-gray-600">+{myAds.length - 12} more</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-600">+{myAds.length - 12} more</p>
                   </div>
                 )}
               </div>

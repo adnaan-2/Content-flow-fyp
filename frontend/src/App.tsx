@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
@@ -31,9 +32,10 @@ import AuthCallback from "./pages/AuthCallback";
 
 function App() {
   return (
-    <AuthProvider>
-      <NotificationProvider>
-        <TooltipProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <NotificationProvider>
+          <TooltipProvider>
           <Router>
             <Routes>
               {/* Public Routes */}
@@ -77,6 +79,7 @@ function App() {
         </TooltipProvider>
       </NotificationProvider>
     </AuthProvider>
+    </ThemeProvider>
   );
 }
 

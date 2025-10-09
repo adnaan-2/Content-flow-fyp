@@ -29,7 +29,7 @@ const platforms = [
   { 
     id: "twitter", 
     name: "X (Twitter)", 
-    logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/X_logo_2023.svg/2048px-X_logo_2023.svg.png",
+    logo: "https://abs.twimg.com/favicons/twitter.3.ico",
     color: "#000000"
   },
   { 
@@ -68,22 +68,22 @@ const ModernCalendar = ({ value, onChange }: { value: Date; onChange: (date: Dat
   };
   
   return (
-    <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 shadow-lg">
+    <div className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg p-3 shadow-lg">
       {/* Header */}
       <div className="flex items-center justify-between mb-2">
         <Button
           variant="ghost"
           size="sm"
           onClick={goToPreviousMonth}
-          className="h-6 w-6 rounded-full bg-gray-800 hover:bg-gray-700 border border-gray-600 p-0"
+          className="h-6 w-6 rounded-full bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 p-0"
         >
-          <ChevronLeft className="h-2 w-2 text-gray-300" />
+          <ChevronLeft className="h-2 w-2 text-gray-600 dark:text-gray-300" />
         </Button>
         
         <div className="flex flex-col items-center gap-1">
           <div className="flex items-center gap-1">
-            <CalendarIcon className="h-3 w-3 text-purple-400" />
-            <h2 className="text-sm font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+            <CalendarIcon className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+            <h2 className="text-sm font-bold bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400 bg-clip-text text-transparent">
               {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
             </h2>
           </div>
@@ -95,7 +95,7 @@ const ModernCalendar = ({ value, onChange }: { value: Date; onChange: (date: Dat
               setCurrentMonth(today);
               onChange(today);
             }}
-            className="h-5 px-2 text-xs bg-gray-800 hover:bg-purple-600 border border-gray-600 text-gray-300 hover:text-white"
+            className="h-5 px-2 text-xs bg-gray-200 dark:bg-gray-800 hover:bg-purple-600 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:text-white"
           >
             Today
           </Button>
@@ -105,9 +105,9 @@ const ModernCalendar = ({ value, onChange }: { value: Date; onChange: (date: Dat
           variant="ghost"
           size="sm"
           onClick={goToNextMonth}
-          className="h-6 w-6 rounded-full bg-gray-800 hover:bg-gray-700 border border-gray-600 p-0"
+          className="h-6 w-6 rounded-full bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 p-0"
         >
-          <ChevronRight className="h-2 w-2 text-gray-300" />
+          <ChevronRight className="h-2 w-2 text-gray-600 dark:text-gray-300" />
         </Button>
       </div>
       
@@ -115,7 +115,7 @@ const ModernCalendar = ({ value, onChange }: { value: Date; onChange: (date: Dat
       <div className="grid grid-cols-7 gap-1 mb-2">
         {weekdays.map(day => (
           <div key={day} className="text-center py-1">
-            <span className="text-xs font-medium text-gray-400">{day.slice(0, 2)}</span>
+            <span className="text-xs font-medium text-gray-600 dark:text-gray-400">{day.slice(0, 2)}</span>
           </div>
         ))}
       </div>
@@ -138,12 +138,12 @@ const ModernCalendar = ({ value, onChange }: { value: Date; onChange: (date: Dat
                 ${isSelected 
                   ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg transform scale-105' 
                   : isCurrentDay
-                  ? 'bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-purple-300 border border-purple-500/30'
+                  ? 'bg-gradient-to-r from-purple-100 to-blue-100 dark:from-purple-500/20 dark:to-blue-500/20 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-500/30'
                   : isPast
-                  ? 'text-gray-600 cursor-not-allowed'
+                  ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed'
                   : isCurrentMonth
-                  ? 'text-gray-300 hover:bg-gray-800 hover:text-white'
-                  : 'text-gray-600'
+                  ? 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+                  : 'text-gray-400 dark:text-gray-600'
                 }
               `}
             >
@@ -176,18 +176,18 @@ const ModernTimePicker = ({ value, onChange }: { value: string; onChange: (time:
     <div className="relative">
       <div 
         onClick={() => setShowPicker(!showPicker)}
-        className="bg-gray-900 border border-gray-700 rounded-lg p-2 cursor-pointer hover:border-purple-500 transition-colors duration-200 group"
+        className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg p-2 cursor-pointer hover:border-purple-500 transition-colors duration-200 group"
       >
         <div className="flex items-center justify-center gap-2">
-          <Clock className="h-3 w-3 text-purple-400 group-hover:text-purple-300" />
-          <span className="text-sm font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+          <Clock className="h-3 w-3 text-purple-600 dark:text-purple-400 group-hover:text-purple-500 dark:group-hover:text-purple-300" />
+          <span className="text-sm font-bold bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400 bg-clip-text text-transparent">
             {formatTime(value)}
           </span>
         </div>
       </div>
       
       {showPicker && (
-        <div className="absolute top-full mt-1 left-0 right-0 bg-gray-900 border border-gray-700 rounded-lg p-2 shadow-2xl z-50">
+        <div className="absolute top-full mt-1 left-0 right-0 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg p-2 shadow-2xl z-50">
           <div className="flex items-center justify-center gap-2">
             {/* Hours */}
             <div className="flex flex-col items-center">
@@ -195,24 +195,24 @@ const ModernTimePicker = ({ value, onChange }: { value: string; onChange: (time:
                 variant="ghost"
                 size="sm"
                 onClick={() => handleTimeChange(((parseInt(hours) + 1) % 24).toString(), minutes)}
-                className="h-5 w-5 rounded-full bg-gray-800 hover:bg-purple-600 p-0"
+                className="h-5 w-5 rounded-full bg-gray-200 dark:bg-gray-800 hover:bg-purple-600 p-0"
               >
                 <ChevronRight className="h-2 w-2 rotate-[-90deg]" />
               </Button>
-              <div className="bg-gray-800 rounded px-1 py-1 m-1 min-w-[2rem] text-center">
-                <span className="text-sm font-bold text-purple-400">{hours.padStart(2, '0')}</span>
+              <div className="bg-gray-200 dark:bg-gray-800 rounded px-1 py-1 m-1 min-w-[2rem] text-center">
+                <span className="text-sm font-bold text-purple-600 dark:text-purple-400">{hours.padStart(2, '0')}</span>
               </div>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => handleTimeChange(((parseInt(hours) - 1 + 24) % 24).toString(), minutes)}
-                className="h-5 w-5 rounded-full bg-gray-800 hover:bg-purple-600 p-0"
+                className="h-5 w-5 rounded-full bg-gray-200 dark:bg-gray-800 hover:bg-purple-600 p-0"
               >
                 <ChevronRight className="h-2 w-2 rotate-90" />
               </Button>
             </div>
             
-            <span className="text-sm font-bold text-gray-500">:</span>
+            <span className="text-sm font-bold text-gray-600 dark:text-gray-500">:</span>
             
             {/* Minutes */}
             <div className="flex flex-col items-center">
@@ -220,18 +220,18 @@ const ModernTimePicker = ({ value, onChange }: { value: string; onChange: (time:
                 variant="ghost"
                 size="sm"
                 onClick={() => handleTimeChange(hours, ((parseInt(minutes) + 5) % 60).toString())}
-                className="h-5 w-5 rounded-full bg-gray-800 hover:bg-purple-600 p-0"
+                className="h-5 w-5 rounded-full bg-gray-200 dark:bg-gray-800 hover:bg-purple-600 p-0"
               >
                 <ChevronRight className="h-2 w-2 rotate-[-90deg]" />
               </Button>
-              <div className="bg-gray-800 rounded px-1 py-1 m-1 min-w-[2rem] text-center">
-                <span className="text-sm font-bold text-blue-400">{minutes.padStart(2, '0')}</span>
+              <div className="bg-gray-200 dark:bg-gray-800 rounded px-1 py-1 m-1 min-w-[2rem] text-center">
+                <span className="text-sm font-bold text-blue-600 dark:text-blue-400">{minutes.padStart(2, '0')}</span>
               </div>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => handleTimeChange(hours, ((parseInt(minutes) - 5 + 60) % 60).toString())}
-                className="h-5 w-5 rounded-full bg-gray-800 hover:bg-purple-600 p-0"
+                className="h-5 w-5 rounded-full bg-gray-200 dark:bg-gray-800 hover:bg-purple-600 p-0"
               >
                 <ChevronRight className="h-2 w-2 rotate-90" />
               </Button>
@@ -785,15 +785,20 @@ const UploadMedia = () => {
                     disabled={!isConnected}
                     title={!isConnected ? `Connect your ${platform.name} account first` : ''}
                   >
-                    <div className="h-8 w-8 rounded-full overflow-hidden flex items-center justify-center border border-gray-300/30 shadow-sm">
-                      <img 
-                        src={platform.logo} 
-                        alt={`${platform.name} logo`}
-                        className="h-full w-full object-cover"
-                        style={{
-                          filter: platform.id === 'twitter' ? 'invert(1)' : 'none'
-                        }}
-                        onError={(e) => {
+                    <div className={`h-8 w-8 rounded-full overflow-hidden flex items-center justify-center border border-gray-300/30 shadow-sm ${
+                      platform.id === 'twitter' ? 'bg-black' : ''
+                    }`}>
+                      {platform.id === 'twitter' ? (
+                        <div className="text-white font-bold text-lg">𝕏</div>
+                      ) : (
+                        <img 
+                          src={platform.logo} 
+                          alt={`${platform.name} logo`}
+                          className="h-full w-full object-cover"
+                          style={{
+                            filter: 'none'
+                          }}
+                          onError={(e) => {
                           // Fallback to colored letter if image fails to load
                           const target = e.target as HTMLImageElement;
                           target.style.display = 'none';
@@ -804,7 +809,8 @@ const UploadMedia = () => {
                             parent.style.borderColor = `${platform.color}40`;
                           }
                         }}
-                      />
+                        />
+                      )}
                     </div>
                     
                     <div className="flex-1 text-left">
@@ -900,20 +906,20 @@ const UploadMedia = () => {
 
       {/* Modern Schedule Dialog */}
       <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>
-        <DialogContent className="sm:max-w-lg max-w-[90vw] max-h-[95vh] bg-gray-800 border border-gray-700 overflow-hidden">
-          <DialogHeader className="bg-gradient-to-r from-purple-800/30 to-blue-800/30 -m-6 mb-3 p-3 rounded-t-lg">
-            <DialogTitle className="text-lg font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent flex items-center gap-2">
-              <CalendarIcon className="h-4 w-4 text-purple-400" />
+        <DialogContent className="sm:max-w-lg max-w-[90vw] max-h-[95vh] bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 overflow-hidden">
+          <DialogHeader className="bg-gradient-to-r from-purple-100/50 to-blue-100/50 dark:from-purple-800/30 dark:to-blue-800/30 -m-6 mb-3 p-3 rounded-t-lg">
+            <DialogTitle className="text-lg font-bold bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400 bg-clip-text text-transparent flex items-center gap-2">
+              <CalendarIcon className="h-4 w-4 text-purple-600 dark:text-purple-400" />
               Schedule Your Post
             </DialogTitle>
           
           </DialogHeader>
           
-          <div className="space-y-3 px-1">
+          <div className="space-y-3 px-1 max-h-[70vh] overflow-y-auto">
             {/* Date Selection */}
             <div className="space-y-2">
-              <Label className="text-sm font-semibold text-gray-200 flex items-center gap-1">
-                <CalendarIcon className="h-3 w-3 text-purple-400" />
+              <Label className="text-sm font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-1">
+                <CalendarIcon className="h-3 w-3 text-purple-600 dark:text-purple-400" />
                 Select Date
               </Label>
               <ModernCalendar 
@@ -924,8 +930,8 @@ const UploadMedia = () => {
             
             {/* Time Selection */}
             <div className="space-y-2">
-              <Label className="text-sm font-semibold text-gray-200 flex items-center gap-1">
-                <Clock className="h-3 w-3 text-blue-400" />
+              <Label className="text-sm font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-1">
+                <Clock className="h-3 w-3 text-blue-600 dark:text-blue-400" />
                 Select Time
               </Label>
               <ModernTimePicker 
@@ -935,10 +941,10 @@ const UploadMedia = () => {
             </div>
             
             {/* Selected DateTime Display */}
-            <div className="bg-gradient-to-r from-purple-800/20 to-blue-800/20 border border-purple-600/30 rounded-lg p-2">
+            <div className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-800/20 dark:to-blue-800/20 border border-purple-200 dark:border-purple-600/30 rounded-lg p-2">
               <div className="text-center">
-                <p className="text-xs text-gray-400">Scheduled for:</p>
-                <p className="text-sm font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+                <p className="text-xs text-gray-600 dark:text-gray-400">Scheduled for:</p>
+                <p className="text-sm font-bold bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400 bg-clip-text text-transparent">
                   {format(scheduledDate, 'MMM do, yyyy')} at {(() => {
                     const [h, m] = scheduledTime.split(':');
                     const hour12 = parseInt(h) % 12 || 12;
@@ -950,11 +956,11 @@ const UploadMedia = () => {
             </div>
             
             {/* Action Buttons */}
-            <div className="flex gap-2">
+            <div className="flex gap-2 pt-2 border-t border-gray-200 dark:border-gray-700 mt-4">
               <Button 
                 variant="outline" 
                 onClick={() => setShowScheduleDialog(false)}
-                className="flex-1 bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600 h-9 text-sm"
+                className="flex-1 bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 h-9 text-sm"
               >
                 Cancel
               </Button>

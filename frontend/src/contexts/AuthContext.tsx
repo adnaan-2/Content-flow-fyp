@@ -2,10 +2,12 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { authService } from '@/services/api';
 
 interface User {
-  profileImage: any;
   _id: string;
   name: string;
   email: string;
+  profilePicture?: string;
+  profilePhoto?: string;
+  profileImage?: string; // For backward compatibility
 }
 
 interface AuthContextType {
@@ -46,7 +48,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         // This will use the token from localStorage through our interceptor
         const response = await authService.getProfile();
-        setUser(response.data);
+        const userData = response.data.user || response.data;
+        console.log('🔍 Profile data received:', userData);
+        setUser(userData);
+        // Update localStorage with fresh user data
+        localStorage.setItem('user', JSON.stringify(userData));
       } catch (error) {
         console.error('Token verification failed:', error);
         logout();

@@ -420,9 +420,9 @@ export default function SchedulePost() {
     return (
       <div className="w-full h-full">
         {/* Calendar Header */}
-        <div className="flex items-center justify-between mb-6 bg-black border border-gray-800 rounded-xl p-6 shadow-xl">
+        <div className="flex items-center justify-between mb-6 bg-white dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl p-6 shadow-xl">
           <div className="flex items-center gap-4">
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400 bg-clip-text text-transparent">
               {monthNames[currentMonth]} {currentYear}
             </h1>
             <div className="flex gap-3">
@@ -430,7 +430,7 @@ export default function SchedulePost() {
                 variant="outline" 
                 size="lg" 
                 onClick={goToPreviousMonth}
-                className="border border-purple-500 text-purple-400 hover:bg-purple-500 hover:text-white font-bold px-6 bg-gray-700"
+                className="border border-purple-500 text-purple-600 dark:text-purple-400 hover:bg-purple-500 hover:text-white font-bold px-6 bg-gray-100 dark:bg-gray-700"
               >
                 ← Prev
               </Button>
@@ -438,7 +438,7 @@ export default function SchedulePost() {
                 variant="outline" 
                 size="lg" 
                 onClick={goToNextMonth}
-                className="border border-purple-500 text-purple-400 hover:bg-purple-500 hover:text-white font-bold px-6 bg-gray-700"
+                className="border border-purple-500 text-purple-600 dark:text-purple-400 hover:bg-purple-500 hover:text-white font-bold px-6 bg-gray-100 dark:bg-gray-700"
               >
                 Next →
               </Button>
@@ -449,7 +449,7 @@ export default function SchedulePost() {
           <div className="flex gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="gap-2 bg-gray-700 border border-gray-600 hover:bg-purple-500 hover:text-white hover:border-purple-500 font-semibold text-gray-200">
+                <Button variant="outline" className="gap-2 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-purple-500 hover:text-white hover:border-purple-500 font-semibold text-gray-800 dark:text-gray-200">
                   <Filter className="h-5 w-5" />
                   Platforms
                   {selectedPlatformFilter.length > 0 && (
@@ -500,7 +500,7 @@ export default function SchedulePost() {
         {/* Weekday Headers */}
         <div className="grid grid-cols-7 gap-3 mb-4">
           {weekdays.map(day => (
-            <div key={day} className="text-center font-bold text-white py-4 bg-black rounded-xl border border-gray-800">
+            <div key={day} className="text-center font-bold text-gray-900 dark:text-white py-4 bg-white dark:bg-black rounded-xl border border-gray-200 dark:border-gray-800">
               {day}
             </div>
           ))}
@@ -510,7 +510,7 @@ export default function SchedulePost() {
         <div className="grid grid-cols-7 gap-3 h-[calc(100vh-200px)]">
           {calendarDays.map((date, index) => {
             if (!date) {
-              return <div key={index} className="bg-black border border-gray-800 rounded-xl"></div>;
+              return <div key={index} className="bg-white dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl"></div>;
             }
             
             const postsForDay = getPostsForDate(date);
@@ -533,20 +533,20 @@ export default function SchedulePost() {
               <div
                 key={index}
                 className={cn(
-                  "bg-black border border-gray-800 rounded-xl p-3 transition-all duration-300 flex flex-col shadow-lg min-h-[140px]",
-                  hasScheduledPosts ? "cursor-pointer hover:shadow-xl hover:border-purple-400 hover:-translate-y-1 hover:bg-gray-900" : "cursor-default",
-                  isToday && "bg-gradient-to-br from-blue-900/50 to-purple-900/50 border-blue-400 ring-2 ring-blue-400/40",
-                  hasScheduledPosts && "bg-gradient-to-br from-purple-900/50 via-pink-900/50 to-blue-900/50 border-purple-400 shadow-xl",
-                  isSelected && "ring-2 ring-purple-400 shadow-2xl transform scale-105 bg-purple-900/30"
+                  "bg-white dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl p-3 transition-all duration-300 flex flex-col shadow-lg min-h-[140px]",
+                  hasScheduledPosts ? "cursor-pointer hover:shadow-xl hover:border-purple-400 hover:-translate-y-1 hover:bg-gray-50 dark:hover:bg-gray-900" : "cursor-default",
+                  isToday && "bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/50 dark:to-purple-900/50 border-blue-400 ring-2 ring-blue-400/40",
+                  hasScheduledPosts && "bg-gradient-to-br from-purple-100 via-pink-100 to-blue-100 dark:from-purple-900/50 dark:via-pink-900/50 dark:to-blue-900/50 border-purple-400 shadow-xl",
+                  isSelected && "ring-2 ring-purple-400 shadow-2xl transform scale-105 bg-purple-100 dark:bg-purple-900/30"
                 )}
                 onClick={handleDateClick}
               >
                 {/* Date Number */}
                 <div className={cn(
                   "text-2xl font-bold mb-2 leading-none",
-                  !hasScheduledPosts && !isToday && "text-gray-300",
-                  isToday && "text-blue-400",
-                  hasScheduledPosts && "text-purple-400"
+                  !hasScheduledPosts && !isToday && "text-gray-600 dark:text-gray-300",
+                  isToday && "text-blue-600 dark:text-blue-400",
+                  hasScheduledPosts && "text-purple-700 dark:text-purple-400"
                 )}>
                   {date.getDate()}
                 </div>
@@ -586,7 +586,7 @@ export default function SchedulePost() {
                   </div>
                 ) : (
                   <div className="mt-auto text-center">
-                    <div className="text-xs text-white-500 opacity-70">
+                    <div className="text-xs text-gray-500 dark:text-gray-500 opacity-70">
                       No posts scheduled
                     </div>
                   </div>
@@ -600,13 +600,13 @@ export default function SchedulePost() {
   };
 
   return (
-    <div className="h-screen w-full p-6 bg-black">
+    <div className="h-screen w-full p-6 bg-gray-50 dark:bg-black">
       <CustomCalendar />
       
       {/* Posts List Modal/Sidebar for Selected Date */}
       {showSidebar && selectedDate && getPostsForDate(selectedDate).length > 0 && (
-        <Card className="fixed top-6 right-6 w-80 max-h-[calc(100vh-3rem)] overflow-y-auto shadow-2xl border border-gray-800 bg-black/95 backdrop-blur-md">
-          <CardHeader className="pb-3 bg-gradient-to-r from-purple-800/30 to-blue-800/30 rounded-t-lg relative">
+        <Card className="fixed top-6 right-6 w-80 max-h-[calc(100vh-3rem)] overflow-y-auto shadow-2xl border border-gray-200 dark:border-gray-800 bg-white/95 dark:bg-black/95 backdrop-blur-md">
+          <CardHeader className="pb-3 bg-gradient-to-r from-purple-100/50 to-blue-100/50 dark:from-purple-800/30 dark:to-blue-800/30 rounded-t-lg relative">
             <Button
               variant="ghost"
               size="sm"
@@ -614,14 +614,14 @@ export default function SchedulePost() {
                 setShowSidebar(false);
                 setSelectedDate(null);
               }}
-              className="absolute top-2 right-2 h-8 w-8 p-0 text-gray-400 hover:text-white hover:bg-gray-700"
+              className="absolute top-2 right-2 h-8 w-8 p-0 text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700"
             >
               <X className="h-4 w-4" />
             </Button>
-            <CardTitle className="text-lg font-bold text-purple-400 pr-8">
+            <CardTitle className="text-lg font-bold text-purple-600 dark:text-purple-400 pr-8">
               {format(selectedDate, 'MMM dd, yyyy')}
             </CardTitle>
-            <CardDescription className="text-purple-300">
+            <CardDescription className="text-purple-500 dark:text-purple-300">
               {getPostsForDate(selectedDate).length} scheduled post{getPostsForDate(selectedDate).length > 1 ? 's' : ''}
             </CardDescription>
           </CardHeader>
@@ -636,9 +636,9 @@ export default function SchedulePost() {
                   key={post._id}
                   className={cn(
                     "border rounded-xl p-4 transition-all duration-200 group relative",
-                    isPosted && "bg-gradient-to-br from-green-800/20 to-emerald-800/20 border-green-600/50",
-                    isPending && "bg-gradient-to-br from-purple-800/20 to-blue-800/20 border-purple-600/50 hover:shadow-md",
-                    isFailed && "bg-gradient-to-br from-red-800/20 to-pink-800/20 border-red-600/50"
+                    isPosted && "bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-800/20 dark:to-emerald-800/20 border-green-200 dark:border-green-600/50",
+                    isPending && "bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-800/20 dark:to-blue-800/20 border-purple-200 dark:border-purple-600/50 hover:shadow-md",
+                    isFailed && "bg-gradient-to-br from-red-50 to-pink-50 dark:from-red-800/20 dark:to-pink-800/20 border-red-200 dark:border-red-600/50"
                   )}
                 >
                   {/* Status Badge */}
@@ -646,9 +646,9 @@ export default function SchedulePost() {
                     <Badge
                       className={cn(
                         "text-xs font-medium",
-                        isPosted && "bg-green-800/30 text-green-300 border-green-600/50",
-                        isPending && "bg-purple-800/30 text-purple-300 border-purple-600/50",
-                        isFailed && "bg-red-800/30 text-red-300 border-red-600/50"
+                        isPosted && "bg-green-100 dark:bg-green-800/30 text-green-700 dark:text-green-300 border-green-300 dark:border-green-600/50",
+                        isPending && "bg-purple-100 dark:bg-purple-800/30 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-600/50",
+                        isFailed && "bg-red-100 dark:bg-red-800/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-600/50"
                       )}
                     >
                       {post.status.charAt(0).toUpperCase() + post.status.slice(1)}
@@ -657,10 +657,10 @@ export default function SchedulePost() {
 
                   <div className="flex items-start justify-between mb-3 pr-16">
                     <div className="flex-1">
-                      <p className="font-semibold text-sm text-gray-200 mb-1">
+                      <p className="font-semibold text-sm text-gray-900 dark:text-gray-200 mb-1">
                         {format(new Date(post.scheduledTime), 'h:mm a')}
                       </p>
-                      <p className="text-gray-400 text-xs line-clamp-2">
+                      <p className="text-gray-600 dark:text-gray-400 text-xs line-clamp-2">
                         {post.caption}
                       </p>
                     </div>
@@ -679,7 +679,7 @@ export default function SchedulePost() {
                       return (
                         <Badge 
                           key={platform} 
-                          className="text-xs font-medium border border-gray-600 bg-gray-700 text-gray-300"
+                          className="text-xs font-medium border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
                         >
                           <span className="mr-1">
                             {IconComponent && <IconComponent className="h-3 w-3" />}
@@ -692,17 +692,17 @@ export default function SchedulePost() {
 
                   {/* Action Buttons or Status Message */}
                   {isPosted ? (
-                    <div className="pt-3 border-t border-green-600/50">
+                    <div className="pt-3 border-t border-green-200 dark:border-green-600/50">
                       <div className="text-center py-2">
-                        <p className="text-xs font-medium text-green-300">
+                        <p className="text-xs font-medium text-green-700 dark:text-green-300">
                           ✅ This post has been successfully published to all platforms
                         </p>
                       </div>
                     </div>
                   ) : isFailed ? (
-                    <div className="pt-3 border-t border-red-600/50">
+                    <div className="pt-3 border-t border-red-200 dark:border-red-600/50">
                       <div className="text-center py-2">
-                        <p className="text-xs font-medium text-red-300 mb-2">
+                        <p className="text-xs font-medium text-red-700 dark:text-red-300 mb-2">
                           ❌ Failed to publish - you can edit and retry
                         </p>
                         <div className="flex gap-2">
@@ -710,7 +710,7 @@ export default function SchedulePost() {
                             size="sm"
                             variant="outline"
                             onClick={() => handleEditPost(post)}
-                            className="flex-1 text-xs hover:bg-purple-500/20 hover:border-purple-400 bg-gray-700 border-gray-600 text-gray-300"
+                            className="flex-1 text-xs hover:bg-purple-100 dark:hover:bg-purple-500/20 hover:border-purple-400 bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300"
                           >
                             <Edit className="h-3 w-3 mr-1" />
                             Edit & Retry
@@ -719,7 +719,7 @@ export default function SchedulePost() {
                             size="sm"
                             variant="outline"
                             onClick={() => handleDeletePost(post._id)}
-                            className="flex-1 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/20 bg-gray-700 border-gray-600"
+                            className="flex-1 text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-100 dark:hover:bg-red-500/20 bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600"
                           >
                             <Trash2 className="h-3 w-3 mr-1" />
                             Delete
@@ -728,13 +728,13 @@ export default function SchedulePost() {
                       </div>
                     </div>
                   ) : (
-                    <div className="pt-3 border-t border-purple-600/50">
+                    <div className="pt-3 border-t border-purple-200 dark:border-purple-600/50">
                       <div className="flex gap-2">
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => handleEditPost(post)}
-                          className="flex-1 text-xs hover:bg-purple-500/20 hover:border-purple-400 hover:text-purple-300 bg-gray-700 border-gray-600 text-gray-300"
+                          className="flex-1 text-xs hover:bg-purple-100 dark:hover:bg-purple-500/20 hover:border-purple-400 hover:text-purple-700 dark:hover:text-purple-300 bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300"
                         >
                           <Edit className="h-3 w-3 mr-1" />
                           Edit
@@ -743,7 +743,7 @@ export default function SchedulePost() {
                           size="sm"
                           variant="outline"
                           onClick={() => handleDeletePost(post._id)}
-                          className="flex-1 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/20 bg-gray-700 border-gray-600"
+                          className="flex-1 text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-100 dark:hover:bg-red-500/20 bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600"
                         >
                           <Trash2 className="h-3 w-3 mr-1" />
                           Delete

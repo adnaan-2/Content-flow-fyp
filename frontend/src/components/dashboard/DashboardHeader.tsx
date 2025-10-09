@@ -49,7 +49,7 @@ const DashboardHeader = ({ toggleSidebar }: DashboardHeaderProps) => {
   };
   
   return (
-    <header className="bg-background border-b py-3 px-4 flex items-center justify-between">
+    <header className="bg-white dark:bg-black border-b border-gray-200 dark:border-gray-800 py-3 px-4 flex items-center justify-between shadow-sm">
       <Button 
         variant="ghost" 
         size="icon" 
@@ -69,7 +69,7 @@ const DashboardHeader = ({ toggleSidebar }: DashboardHeaderProps) => {
             className="relative" 
             onClick={() => navigate('/dashboard/notifications')}
           >
-            <Bell className="h-5 w-5" />
+            <Bell className="h-6 w-6" />
             {unreadCount > 0 && (
               <Badge 
                 className="absolute -top-1 -right-1 h-5 min-w-5 flex items-center justify-center text-xs bg-red-500 hover:bg-red-600 text-white rounded-full px-1"
@@ -84,15 +84,29 @@ const DashboardHeader = ({ toggleSidebar }: DashboardHeaderProps) => {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-800 px-2">
               <Avatar className="h-8 w-8">
-                {user?.profileImage ? (
+                {(user?.profilePhoto || user?.profilePicture || user?.profileImage) ? (
                   <AvatarImage 
-                    src={user.profileImage} 
+                    src={user.profilePhoto || user.profilePicture || user.profileImage} 
                     alt={user?.name || "User"} 
+                    onError={(e) => {
+                      // Hide the image and show fallback if it fails to load
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
                   />
                 ) : (
-                  <AvatarFallback>{getInitials(user?.name || "User")}</AvatarFallback>
+                  <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
+                    {getInitials(user?.name || "User")}
+                  </AvatarFallback>
                 )}
               </Avatar>
+              <div className="hidden sm:block text-left">
+                <div className="text-sm font-medium leading-none">
+                  {user?.name || "User"}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {user?.email || ""}
+                </div>
+              </div>
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
             </Button>
           </DropdownMenuTrigger>

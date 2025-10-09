@@ -36,7 +36,7 @@ const DashboardSidebar = ({ isOpen, toggleSidebar }: DashboardSidebarProps) => {
       className={`${
         isOpen ? "w-64" : "w-20"
       } transition-all duration-300 ease-in-out fixed top-0 left-0 z-50 
-      h-screen bg-background/80 backdrop-blur-md border-r shadow-lg flex flex-col`}
+      h-screen bg-white dark:bg-black border-r border-gray-200 dark:border-gray-800 shadow-lg flex flex-col`}
     >
       <div className="p-4 flex items-center justify-between">
         <Link to="/dashboard" className={`flex items-center gap-2 text-primary font-bold ${isOpen ? 'text-xl' : 'text-sm justify-center w-full'}`}>
@@ -72,10 +72,10 @@ const DashboardSidebar = ({ isOpen, toggleSidebar }: DashboardSidebarProps) => {
                 className={`flex items-center px-4 py-3 rounded-xl transition-all ${
                   isActive(item.path) 
                     ? "bg-primary text-primary-foreground shadow-md" 
-                    : "hover:bg-primary/10 text-foreground/80 hover:text-foreground"
+                    : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
                 }`}
               >
-                <item.icon className={`${isOpen ? "mr-3" : "mx-auto"} h-5 w-5 ${isActive(item.path) ? "" : "text-muted-foreground"}`} />
+                <item.icon className={`${isOpen ? "mr-3" : "mx-auto"} h-5 w-5 ${isActive(item.path) ? "" : "text-gray-500 dark:text-gray-400"}`} />
                 {isOpen && <span className="font-medium">{item.label}</span>}
               </Link>
             </li>
