@@ -3,11 +3,6 @@ const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const User = require('../models/User');
 const { sendWelcomeEmail } = require('../utils/emailService');
 
-// Debug environment variables
-console.log('Passport Config - Google Client ID:', process.env.GOOGLE_CLIENT_ID ? 'SET' : 'NOT SET');
-console.log('Passport Config - Google Client Secret:', process.env.GOOGLE_CLIENT_SECRET ? 'SET' : 'NOT SET');
-console.log('Passport Config - Google Callback URL:', process.env.GOOGLE_CALLBACK_URL);
-
 // Configure Google OAuth Strategy
 passport.use(new GoogleStrategy({
   clientID: process.env.GOOGLE_CLIENT_ID,

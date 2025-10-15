@@ -1,7 +1,6 @@
 const User = require('../models/User'); // Fixed import path
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const passport = require('../config/passport');
 const { generateVerificationCode, generateResetToken, sendVerificationEmail, sendPasswordResetEmail, sendPasswordResetCodeEmail, sendWelcomeEmail, sendNewDeviceLoginEmail } = require('../utils/emailService');
 const { getDeviceInfo, createDeviceFingerprint, isNewDevice, addKnownDevice, updateDeviceLastUsed, getLocationFromIP } = require('../utils/deviceUtils');
 
