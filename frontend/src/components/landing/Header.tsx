@@ -44,7 +44,7 @@ const Header = () => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
-            <Link to="/" className="text-2xl font-bold">SocialFuse</Link>
+            <Link to="/" className="text-2xl font-bold">ContentFlow</Link>
             <nav className="hidden md:block ml-10">
               <ul className="flex space-x-8">
                 <li><Link to="/#features" className="hover:text-primary transition-colors">Features</Link></li>
