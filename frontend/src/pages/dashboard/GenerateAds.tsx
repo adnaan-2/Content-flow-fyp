@@ -57,6 +57,7 @@ const GenerateAds = () => {
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [showRatioDropdown, setShowRatioDropdown] = useState(false);
   const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
+  const [isEnhancing, setIsEnhancing] = useState(false);
 
   // Categories with icons and beautiful colors
   const categories = [
@@ -204,6 +205,36 @@ const GenerateAds = () => {
     // Replace placeholder in template with user's custom text or keep as is
     setPrompt(template.prompt);
   };
+
+  const handleEnhancePrompt = async () => {
+    if (!prompt.trim()) {
+      setError('Please enter a prompt to enhance');
+      return;
+    }
+
+    setIsEnhancing(true);
+    setError('');
+
+    try {
+      console.log('Enhancing prompt with AI...');
+      const response = await adService.enhancePrompt({ prompt: prompt.trim() });
+      
+      if (response.data.success) {
+        setPrompt(response.data.enhancedPrompt);
+        setSuccess('✨ Prompt enhanced successfully with AI!');
+        setTimeout(() => setSuccess(''), 3000);
+      } else {
+        throw new Error(response.data.message || 'Failed to enhance prompt');
+      }
+    } catch (err) {
+      console.error('Error enhancing prompt:', err);
+      setError(err.response?.data?.message || 'Failed to enhance prompt. Please try again.');
+    } finally {
+      setIsEnhancing(false);
+    }
+  };
+
+
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -395,172 +426,207 @@ const GenerateAds = () => {
             )}
           </div>
 
-          {/* Bottom Search Bar Section */}
-          <div className="flex-shrink-0 p-2">
-            <div className="w-full max-w-4xl mx-auto">
-              <div className="bg-white dark:bg-black border border-gray-300 dark:border-gray-800 rounded-lg p-3">
-                <div className="flex items-center gap-3">
-                {/* Design Category Button */}
-                <div className="relative dropdown-container">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className={`flex items-center gap-2 h-10 px-4 bg-gray-50 dark:bg-black border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-900 text-gray-700 dark:text-gray-300 text-sm rounded-lg transition-all ${
-                      selectedCategory ? "bg-primary/10 text-foreground border-primary" : ""
-                    }`}
-                    onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                  >
-                    {selectedCategory ? (
-                      <>
-                        {(() => {
-                          const category = categories.find(c => c.id === selectedCategory);
-                          const IconComponent = category?.icon || Palette;
-                          return <IconComponent className="h-3 w-3" />;
-                        })()}
-                        <span className="text-xs hidden sm:block">
-                          {categories.find(c => c.id === selectedCategory)?.name.split(' ')[0]}
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <Palette className="h-3 w-3" />
-                        <span className="text-xs hidden sm:block">Design</span>
-                      </>
-                    )}
-                  </Button>
+          {/* Full Width Input Container Section */}
+          <div className="flex-shrink-0 p-4">
+            <div className="w-full max-w-6xl mx-auto">
+              {/* Full Width Unified Input Container */}
+                <div className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
+                  {/* Main Textarea */}
+                  <div className="relative">
+                    <Textarea
+                      placeholder="Describe your advertisement idea... Be creative and specific!"
+                      value={prompt}
+                      onChange={(e) => setPrompt(e.target.value)}
+                      rows={1}
+                      className="w-full min-h-[120px] bg-transparent border-0 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 resize-none focus:ring-0 focus:outline-0 text-base px-6 pt-6 pb-4 pr-6"
+                      style={{ scrollbarWidth: 'thin', scrollbarColor: '#6b7280 transparent' }}
+                      onInput={(e) => {
+                        const target = e.target as HTMLTextAreaElement;
+                        target.style.height = 'auto';
+                        target.style.height = Math.max(120, Math.min(200, target.scrollHeight)) + 'px';
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          if (!isGenerating && prompt.trim()) {
+                            handleGenerate();
+                          }
+                        }
+                      }}
+                    />
+                  </div>
                   
-                  {showCategoryDropdown && (
-                    <div className="absolute bottom-12 left-0 bg-white dark:bg-black border border-gray-200 dark:border-gray-700 rounded-lg p-3 z-50 min-w-[240px] shadow-xl" style={{ scrollbarWidth: 'thin', scrollbarColor: '#374151 transparent' }}>
-                      <div className="grid grid-cols-2 gap-1">
-                        {categories.map((category) => {
-                          const IconComponent = category.icon;
-                          return (
-                            <Button
-                              key={category.id}
-                              variant="ghost"
-                              size="sm"
-                              className={`h-10 flex flex-col items-center gap-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900 text-sm transition-all ${
-                                selectedCategory === category.id 
-                                  ? "bg-primary text-primary-foreground" 
-                                  : "text-gray-600 dark:text-muted-foreground hover:text-gray-900 dark:hover:text-foreground"
-                              }`}
-                              onClick={() => {
-                                setSelectedCategory(category.id);
-                                setShowCategoryDropdown(false);
-                              }}
-                            >
-                              <div className={`p-1 rounded-sm ${selectedCategory === category.id ? "bg-white/20" : "bg-gray-200 dark:bg-gray-800"}`}>
-                                <IconComponent className="h-3 w-3" />
-                              </div>
-                              <span className="text-xs font-medium">{category.name.split(' ')[0]}</span>
-                            </Button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Ratio Button */}
-                <div className="relative dropdown-container">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className={`flex items-center gap-2 h-10 px-4 bg-gray-50 dark:bg-black border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-900 text-gray-700 dark:text-gray-300 text-sm rounded-lg transition-all ${
-                      selectedSize ? "bg-primary/10 text-foreground border-primary" : ""
-                    }`}
-                    onClick={() => setShowRatioDropdown(!showRatioDropdown)}
-                  >
-                    <div className="border border-gray-400 dark:border-gray-400 rounded bg-gray-400 dark:bg-gray-600" 
-                         style={{ 
-                           width: selectedSize ? 
-                             (sizes.find(s => s.id === selectedSize)?.ratio === '1:1' ? '10px' : 
-                              sizes.find(s => s.id === selectedSize)?.ratio.includes('16:9') ? '12px' : '8px') : '10px',
-                           height: selectedSize ? 
-                             (sizes.find(s => s.id === selectedSize)?.ratio === '1:1' ? '10px' : 
-                              sizes.find(s => s.id === selectedSize)?.ratio.includes('16:9') ? '7px' : '12px') : '10px'
-                         }}>
-                    </div>
-                    <span className="text-sm hidden sm:block">
-                      {selectedSize ? sizes.find(s => s.id === selectedSize)?.ratio : "Ratio"}
-                    </span>
-                  </Button>
-                  
-                  {showRatioDropdown && (
-                    <div className="absolute bottom-12 left-0 bg-white dark:bg-black border border-gray-200 dark:border-gray-700 rounded-lg p-3 z-50 min-w-[160px] shadow-xl" style={{ scrollbarWidth: 'thin', scrollbarColor: '#374151 transparent' }}>
-                      <div className="space-y-1">
-                        {sizes.map((size) => (
+                  {/* Bottom Action Bar */}
+                  <div className="border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 px-6 py-4">
+                    <div className="flex items-center justify-between">
+                      {/* Left Side - Design Controls */}
+                      <div className="flex items-center gap-3">
+                        {/* Design Style Selector */}
+                        <div className="relative">
                           <Button
-                            key={size.id}
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
-                            className={`w-full flex items-center gap-2 justify-start h-8 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-xs ${
-                              selectedSize === size.id 
-                                ? "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200" 
-                                : "text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+                            className={`flex items-center gap-2 h-9 px-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 text-sm rounded-lg transition-all ${
+                              selectedCategory ? "bg-primary/10 text-foreground border-primary" : ""
                             }`}
-                            onClick={() => {
-                              setSelectedSize(size.id);
-                              setShowRatioDropdown(false);
-                            }}
+                            onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
                           >
-                            <div className="border border-gray-400 rounded bg-gray-600" 
+                            <Palette className="h-4 w-4" />
+                            <span className="text-sm hidden sm:inline">
+                              {selectedCategory ? categories.find(c => c.id === selectedCategory)?.name : "Design"}
+                            </span>
+                          </Button>
+                          
+                          {showCategoryDropdown && (
+                            <div className="absolute bottom-12 left-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 z-50 min-w-[200px] shadow-xl">
+                              <div className="space-y-1">
+                                {categories.map((category) => {
+                                  const Icon = category.icon;
+                                  return (
+                                    <Button
+                                      key={category.id}
+                                      variant="ghost"
+                                      size="sm"
+                                      className={`w-full flex items-center gap-2 justify-start h-10 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-sm ${
+                                        selectedCategory === category.id 
+                                          ? "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200" 
+                                          : "text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+                                      }`}
+                                      onClick={() => {
+                                        setSelectedCategory(category.id);
+                                        setShowCategoryDropdown(false);
+                                      }}
+                                    >
+                                      <div className={`w-6 h-6 rounded-lg ${category.color} flex items-center justify-center`}>
+                                        <Icon className="h-3 w-3 text-white" />
+                                      </div>
+                                      <div className="text-left">
+                                        <div className="text-xs">{category.name}</div>
+                                        <div className="text-xs text-gray-500">{category.description}</div>
+                                      </div>
+                                    </Button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Size Ratio Selector */}
+                        <div className="relative">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className={`flex items-center gap-2 h-9 px-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 text-sm rounded-lg transition-all ${
+                              selectedSize ? "bg-primary/10 text-foreground border-primary" : ""
+                            }`}
+                            onClick={() => setShowRatioDropdown(!showRatioDropdown)}
+                          >
+                            <div className="border border-gray-400 dark:border-gray-400 rounded bg-gray-400 dark:bg-gray-600" 
                                  style={{ 
-                                   width: size.ratio === '1:1' ? '8px' : size.ratio.includes('16:9') ? '10px' : '6px',
-                                   height: size.ratio === '1:1' ? '8px' : size.ratio.includes('16:9') ? '6px' : '10px'
+                                   width: selectedSize ? 
+                                     (sizes.find(s => s.id === selectedSize)?.ratio === '1:1' ? '8px' : 
+                                      sizes.find(s => s.id === selectedSize)?.ratio.includes('16:9') ? '10px' : '6px') : '8px',
+                                   height: selectedSize ? 
+                                     (sizes.find(s => s.id === selectedSize)?.ratio === '1:1' ? '8px' : 
+                                      sizes.find(s => s.id === selectedSize)?.ratio.includes('16:9') ? '6px' : '10px') : '8px'
                                  }}>
                             </div>
-                            <div className="text-left">
-                              <div className="text-xs">{size.name}</div>
-                              <div className="text-xs text-gray-500">{size.ratio}</div>
-                            </div>
+                            <span className="text-sm hidden sm:inline">
+                              {selectedSize ? sizes.find(s => s.id === selectedSize)?.ratio : "Ratio"}
+                            </span>
                           </Button>
-                        ))}
+                          
+                          {showRatioDropdown && (
+                            <div className="absolute bottom-12 left-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 z-50 min-w-[160px] shadow-xl">
+                              <div className="space-y-1">
+                                {sizes.map((size) => (
+                                  <Button
+                                    key={size.id}
+                                    variant="ghost"
+                                    size="sm"
+                                    className={`w-full flex items-center gap-2 justify-start h-8 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-xs ${
+                                      selectedSize === size.id 
+                                        ? "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200" 
+                                        : "text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+                                    }`}
+                                    onClick={() => {
+                                      setSelectedSize(size.id);
+                                      setShowRatioDropdown(false);
+                                    }}
+                                  >
+                                    <div className="border border-gray-400 rounded bg-gray-600" 
+                                         style={{ 
+                                           width: size.ratio === '1:1' ? '6px' : size.ratio.includes('16:9') ? '8px' : '5px',
+                                           height: size.ratio === '1:1' ? '6px' : size.ratio.includes('16:9') ? '5px' : '8px'
+                                         }}>
+                                    </div>
+                                    <div className="text-left">
+                                      <div className="text-xs">{size.name}</div>
+                                      <div className="text-xs text-gray-500">{size.ratio}</div>
+                                    </div>
+                                  </Button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Right Side - Action Buttons */}
+                      <div className="flex items-center gap-3">
+                        {/* Enhance Button */}
+                        <Button 
+                          onClick={handleEnhancePrompt} 
+                          disabled={isEnhancing || !prompt.trim() || isGenerating}
+                          variant="outline"
+                          size="sm"
+                          className="bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:text-purple-600 dark:hover:text-purple-400 px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-all duration-200 shadow-sm hover:shadow-md"
+                        >
+                          {isEnhancing ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                              <span className="hidden sm:inline">Enhancing...</span>
+                              <span className="sm:hidden">...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Zap className="h-4 w-4 mr-2" />
+                              <span className="hidden sm:inline">Enhance</span>
+                              <span className="sm:hidden">✨</span>
+                            </>
+                          )}
+                        </Button>
+                        
+                        {/* Generate Button - Hero */}
+                        <Button 
+                          onClick={handleGenerate} 
+                          disabled={isGenerating || !prompt.trim()}
+                          className="relative bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 hover:from-purple-700 hover:via-pink-700 hover:to-blue-700 text-white px-6 py-2.5 rounded-lg border-0 disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 text-sm overflow-hidden min-w-[120px]"
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-pulse opacity-30"></div>
+                          <div className="relative flex items-center justify-center">
+                            {isGenerating ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                <span>Generating...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles className="h-4 w-4 mr-2 animate-pulse" />
+                                <span>Generate Ad</span>
+                              </>
+                            )}
+                          </div>
+                        </Button>
                       </div>
                     </div>
-                  )}
-                </div>
-
-                {/* Main Search Input */}
-                <div className="flex-1 relative">
-                  <Textarea
-                    placeholder="Describe your ad... Be creative and specific!"
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    rows={1}
-                    className="w-full min-h-[40px] bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base rounded-lg px-4 py-3 pr-20"
-                    style={{ scrollbarWidth: 'thin', scrollbarColor: '#374151 transparent' }}
-                    onInput={(e) => {
-                      const target = e.target as HTMLTextAreaElement;
-                      target.style.height = 'auto';
-                      target.style.height = Math.max(40, Math.min(80, target.scrollHeight)) + 'px';
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        if (!isGenerating && prompt.trim()) {
-                          handleGenerate();
-                        }
-                      }
-                    }}
-                  />
-                  <Button 
-                    onClick={handleGenerate} 
-                    disabled={isGenerating || !prompt.trim()}
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-gradient-to-r from-primary to-primary/80 hover:bg-primary/90 text-primary-foreground px-4 py-2 h-auto rounded-xl border-0 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-all shadow-md"
-                  >
-                    {isGenerating ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Sparkles className="h-4 w-4" />
-                    )}
-                  </Button>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-        </div>
+       
 
         {/* Right Sidebar - Design History */}
         <div className="w-64 flex flex-col border-l border-gray-300 dark:border-gray-800 bg-white dark:bg-black">
@@ -668,10 +734,9 @@ const GenerateAds = () => {
             )}
           </div>
         </div>
-      </div>
     </div>
-    
-  );
+    </div>
+  )
 };
 
 export default GenerateAds;

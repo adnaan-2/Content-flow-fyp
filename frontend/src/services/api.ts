@@ -99,6 +99,7 @@ export const scheduleService = {
 
 // Ad generation services
 export const adService = {
+  enhancePrompt: (promptData) => api.post('/ads/enhance-prompt', promptData),
   generateAd: (adData) => api.post('/ads/generate', adData),
   getPresets: () => api.get('/ads/presets'),
   getMyAds: (page = 1, limit = 12) => api.get(`/ads/my-ads?page=${page}&limit=${limit}`),
