@@ -53,6 +53,58 @@ const Subscription = () => {
 
   useEffect(() => {
     loadSubscriptionData();
+    
+    // Check URL parameters for Stripe checkout results
+    const urlParams = new URLSearchParams(window.location.search);
+    const success = urlParams.get('success');
+    const canceled = urlParams.get('canceled');
+    const sessionId = urlParams.get('session_id');
+    const mock = urlParams.get('mock');
+    const plan = urlParams.get('plan');
+    
+    if (success === 'true' && sessionId) {
+      // Verify the checkout session
+      subscriptionApi.verifyCheckout(sessionId)
+        .then(() => {
+          toast({
+            title: "Payment Successful!",
+            description: "Your subscription has been activated.",
+          });
+          loadSubscriptionData();
+        })
+        .catch(() => {
+          toast({
+            title: "Verification Failed",
+            description: "Please contact support if you were charged.",
+            variant: "destructive"
+          });
+        });
+      
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    
+    if (canceled === 'true') {
+      toast({
+        title: "Payment Canceled",
+        description: "You can upgrade your plan anytime.",
+        variant: "default"
+      });
+      
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    
+    if (mock === 'true' && plan) {
+      toast({
+        title: "Development Mode",
+        description: `Mock payment flow for ${plan} plan. Use the upgrade button to simulate payment.`,
+        variant: "default"
+      });
+      
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
   }, []);
 
   const loadSubscriptionData = async () => {
@@ -80,18 +132,54 @@ const Subscription = () => {
   const handleUpgrade = async (planId: string) => {
     try {
       setUpgrading(planId);
-      const response = await subscriptionApi.changeSubscriptionPlan(planId as 'free' | 'standard' | 'premium');
       
-      toast({
-        title: "Success",
-        description: response.message,
-      });
+      // Check if user is already on this plan
+      if (currentPlan === planId) {
+        toast({
+          title: "Already Active",
+          description: "This plan is already active for your account.",
+          variant: "default"
+        });
+        return;
+      }
       
-      await loadSubscriptionData(); // Reload data
+      // If it's free trial, show message
+      if (planId === 'free_trial') {
+        toast({
+          title: "Free Trial",
+          description: "You are already on the free trial. Upgrade to a paid plan for more features.",
+          variant: "default"
+        });
+        return;
+      }
+      
+      // For paid plans, create checkout session
+      if (planId === 'standard' || planId === 'premium') {
+        const response = await subscriptionApi.createCheckoutSession(planId);
+        
+        if (response.mock) {
+          // Handle mock payment for development
+          const confirmPayment = window.confirm(
+            `This is a development environment. Simulate payment for ${planId} plan?`
+          );
+          
+          if (confirmPayment) {
+            const mockResponse = await subscriptionApi.mockPaymentSuccess(planId);
+            toast({
+              title: "Success",
+              description: mockResponse.message,
+            });
+            await loadSubscriptionData();
+          }
+        } else {
+          // Redirect to Stripe checkout
+          window.location.href = response.checkoutUrl;
+        }
+      }
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.response?.data?.message || "Failed to change plan",
+        description: error.response?.data?.message || "Failed to process upgrade",
         variant: "destructive"
       });
     } finally {
@@ -116,22 +204,12 @@ const Subscription = () => {
     }
   };
 
-  const handleAddPaymentMethod = async () => {
-    try {
-      // Mock payment method ID for demo
-      const response = await subscriptionApi.addPaymentMethod("pm_mock_card_visa");
-      toast({
-        title: "Success",
-        description: response.message,
-      });
-      await loadSubscriptionData();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to add payment method",
-        variant: "destructive"
-      });
-    }
+  const handleAddPaymentMethod = () => {
+    toast({
+      title: "Payment Method",
+      description: "Payment method management will be available in the next update. For now, you can update your payment method through the subscription upgrade process.",
+      variant: "default"
+    });
   };
 
   if (loading) {
@@ -147,24 +225,24 @@ const Subscription = () => {
 
   const plans = [
     {
-      id: "free",
-      name: "Free Plan",
+      id: "free_trial",
+      name: "30-Day Free Trial",
       price: 0,
-      interval: "forever",
+      interval: "30 days",
       description: "Perfect for getting started",
       features: [
-        "1 social media account connection",
-        "1 scheduled post per week",
+        "2 social media account connections",
+        "5 scheduled posts per week",
         "Basic analytics",
-        "Community support"
+        "Community support",
+        "30 days free access"
       ],
       limitations: [
-        "Cannot connect multiple accounts of same platform",
-        "Limited scheduling options",
-        "Basic reporting only"
+        "Trial expires after 30 days",
+        "Limited to basic features"
       ],
       isPopular: false,
-      color: "border-gray-300"
+      color: "border-green-300"
     },
     {
       id: "standard",
@@ -295,26 +373,40 @@ const Subscription = () => {
                     disabled
                   >
                     <Check className="h-4 w-4 mr-2" />
-                    Current Plan
+                    Plan Active
                   </Button>
                 ) : (
                   <Button 
                     className={`w-full ${
                       plan.isPopular 
                         ? "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700" 
-                        : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                        : plan.id === "free_trial"
+                        ? "bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
+                        : "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
                     } text-white font-semibold`}
                     onClick={() => handleUpgrade(plan.id)}
                     disabled={upgrading === plan.id}
                   >
                     {upgrading === plan.id ? (
-                  <>
-                    <Loader className="h-4 w-4 mr-2 animate-spin" />
-                    Upgrading...
-                  </>
-                ) : (
-                  plan.id === "free" ? "Downgrade to Free" : "Upgrade Plan"
-                )}
+                      <>
+                        <Loader className="h-4 w-4 mr-2 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        {plan.id === "free_trial" ? (
+                          <>
+                            <Zap className="h-4 w-4 mr-2" />
+                            Start Free Trial
+                          </>
+                        ) : (
+                          <>
+                            <CreditCard className="h-4 w-4 mr-2" />
+                            Upgrade to {plan.name}
+                          </>
+                        )}
+                      </>
+                    )}
                   </Button>
                 )}
               </div>
@@ -346,7 +438,13 @@ const Subscription = () => {
                 <h3 className="text-lg font-semibold text-gray-600 mb-2">No Payment Method Added</h3>
                 <p className="text-gray-500 mb-6">You're currently on the free plan. Add a payment method to upgrade to premium features.</p>
                 <Button 
-                  onClick={handleAddPaymentMethod} 
+                  onClick={() => {
+                    toast({
+                      title: "Payment Method",
+                      description: "Add payment method functionality will be available after upgrading to a paid plan.",
+                      variant: "default"
+                    });
+                  }} 
                   size="lg"
                   className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold"
                 >

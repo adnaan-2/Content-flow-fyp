@@ -2,19 +2,29 @@ const express = require('express');
 const router = express.Router();
 const Subscription = require('../models/Subscription');
 const SocialAccount = require('../models/SocialAccount');
+const User = require('../models/User');
 const { authenticateToken } = require('../middleware/auth');
+const stripeService = require('../services/stripeService');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 // Get user's current subscription
 router.get('/current', authenticateToken, async (req, res) => {
   try {
     let subscription = await Subscription.findOne({ userId: req.user.id });
     
-    // Create default free subscription if none exists
+    // Create default free trial subscription if none exists
     if (!subscription) {
       subscription = new Subscription({
         userId: req.user.id,
-        planType: 'free'
+        planType: 'free_trial',
+        status: 'trial'
       });
+      await subscription.save();
+    }
+    
+    // Check if subscription is expired and update status
+    if (subscription.isExpired()) {
+      subscription.status = 'expired';
       await subscription.save();
     }
 
@@ -31,7 +41,10 @@ router.get('/current', authenticateToken, async (req, res) => {
       success: true,
       subscription: {
         ...subscription.toObject(),
-        planDetails: Subscription.getPlanDetails(subscription.planType)
+        planDetails: Subscription.getPlanDetails(subscription.planType),
+        daysRemaining: subscription.getDaysRemaining(),
+        hasActiveSubscription: subscription.hasActiveSubscription(),
+        isExpired: subscription.isExpired()
       }
     });
   } catch (error) {
@@ -115,55 +128,229 @@ router.get('/check-limits', authenticateToken, async (req, res) => {
   }
 });
 
-// Upgrade/downgrade subscription plan
-router.post('/change-plan', authenticateToken, async (req, res) => {
+// Create checkout session for subscription upgrade
+router.post('/create-checkout-session', authenticateToken, async (req, res) => {
   try {
     const { planType } = req.body;
     
-    if (!['free', 'standard', 'premium'].includes(planType)) {
-      return res.status(400).json({ success: false, message: 'Invalid plan type' });
+    if (!['standard', 'premium'].includes(planType)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid plan type. Only standard and premium plans require payment.' 
+      });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
 
     let subscription = await Subscription.findOne({ userId: req.user.id });
     if (!subscription) {
       subscription = new Subscription({
         userId: req.user.id,
-        planType: 'free'
-      });
-    }
-
-    const oldPlan = subscription.planType;
-    subscription.planType = planType;
-    
-    // If upgrading to paid plan, set billing date
-    if (planType !== 'free') {
-      const nextBilling = new Date();
-      nextBilling.setMonth(nextBilling.getMonth() + 1);
-      subscription.nextBillingDate = nextBilling;
-      subscription.status = 'active';
-    } else {
-      subscription.nextBillingDate = null;
-    }
-
-    await subscription.save();
-
-    // Add to billing history
-    if (planType !== 'free') {
-      subscription.billingHistory.push({
-        amount: subscription.price,
-        status: 'paid',
-        description: `Upgraded to ${subscription.planType} plan`
+        planType: 'free_trial',
+        status: 'trial'
       });
       await subscription.save();
     }
 
+    // Check if Stripe is configured
+    if (!stripeService || !stripe) {
+      // Mock checkout for development/testing
+      return res.json({
+        success: true,
+        checkoutUrl: `${process.env.FRONTEND_URL}/dashboard/subscription?mock=true&plan=${planType}`,
+        sessionId: `mock_session_${Date.now()}`,
+        mock: true
+      });
+    }
+
+    // Create or get Stripe customer
+    let stripeCustomerId = subscription.stripeCustomerId;
+    
+    // Ensure we don't use mock customer IDs
+    if (!stripeCustomerId || stripeCustomerId.includes('mock')) {
+      console.log('Creating new Stripe customer for user:', user.email);
+      const customer = await stripeService.createCustomer(
+        user.email,
+        `${user.firstName} ${user.lastName}`,
+        user._id
+      );
+      stripeCustomerId = customer.id;
+      subscription.stripeCustomerId = stripeCustomerId;
+      await subscription.save();
+      console.log('Created Stripe customer:', stripeCustomerId);
+    }
+
+    // Get the correct price ID based on plan
+    const priceId = planType === 'standard' 
+      ? process.env.STRIPE_STANDARD_PRICE_ID 
+      : process.env.STRIPE_PREMIUM_PRICE_ID;
+
+    if (!priceId) {
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Stripe configuration error. Please contact support.' 
+      });
+    }
+
+    // Create checkout session
+    const session = await stripeService.createCheckoutSession(
+      stripeCustomerId,
+      priceId,
+      `${process.env.FRONTEND_URL}/dashboard/subscription?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      `${process.env.FRONTEND_URL}/dashboard/subscription?canceled=true`,
+      req.user.id
+    );
+
     res.json({
       success: true,
-      message: `Successfully ${planType === 'free' ? 'downgraded' : 'upgraded'} to ${planType} plan`,
-      subscription: {
-        ...subscription.toObject(),
-        planDetails: Subscription.getPlanDetails(subscription.planType)
-      }
+      checkoutUrl: session.url,
+      sessionId: session.id
+    });
+  } catch (error) {
+    console.error('Create checkout session error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to create checkout session',
+      error: error.message 
+    });
+  }
+});
+
+// Mock payment success for development
+router.post('/mock-payment-success', authenticateToken, async (req, res) => {
+  try {
+    const { planType } = req.body;
+    
+    if (!['standard', 'premium'].includes(planType)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid plan type' 
+      });
+    }
+
+    let subscription = await Subscription.findOne({ userId: req.user.id });
+    if (!subscription) {
+      subscription = new Subscription({ userId: req.user.id });
+    }
+
+    subscription.planType = planType;
+    subscription.status = 'active';
+    subscription.stripeSubscriptionId = `mock_sub_${Date.now()}`;
+    
+    const nextBilling = new Date();
+    nextBilling.setMonth(nextBilling.getMonth() + 1);
+    subscription.nextBillingDate = nextBilling;
+    
+    await subscription.save();
+
+    res.json({
+      success: true,
+      message: `Successfully upgraded to ${planType} plan!`,
+      subscription: subscription.toObject()
+    });
+  } catch (error) {
+    console.error('Mock payment success error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Verify checkout session and update subscription
+router.post('/verify-checkout', authenticateToken, async (req, res) => {
+  try {
+    const { sessionId } = req.body;
+    
+    if (!stripe) {
+      return res.status(400).json({
+        success: false,
+        message: 'Stripe not configured'
+      });
+    }
+    
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    
+    if (session.payment_status === 'paid' && session.metadata.userId === req.user.id.toString()) {
+      // Update subscription in database
+      await stripeService.updateUserSubscriptionFromStripe(req.user.id, session.subscription);
+      
+      res.json({
+        success: true,
+        message: 'Subscription activated successfully!'
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: 'Payment verification failed'
+      });
+    }
+  } catch (error) {
+    console.error('Verify checkout error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to verify payment' 
+    });
+  }
+});
+
+// Change subscription plan (for existing paying customers)
+router.post('/change-plan', authenticateToken, async (req, res) => {
+  try {
+    const { planType } = req.body;
+    
+    if (!['standard', 'premium'].includes(planType)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid plan type' 
+      });
+    }
+
+    let subscription = await Subscription.findOne({ userId: req.user.id });
+    
+    if (!subscription) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'No subscription found. Please create a subscription first.' 
+      });
+    }
+
+    // Check if user has an active Stripe subscription
+    if (!subscription.stripeSubscriptionId) {
+      return res.status(400).json({
+        success: false,
+        message: 'No active payment subscription found. Please subscribe first.',
+        requiresPayment: true
+      });
+    }
+
+    if (!stripeService) {
+      // Mock plan change for development
+      subscription.planType = planType;
+      await subscription.save();
+      
+      return res.json({
+        success: true,
+        message: `Successfully changed to ${planType} plan`,
+        subscription: subscription.toObject()
+      });
+    }
+
+    // Update Stripe subscription
+    const priceId = planType === 'standard' 
+      ? process.env.STRIPE_STANDARD_PRICE_ID 
+      : process.env.STRIPE_PREMIUM_PRICE_ID;
+
+    await stripeService.updateSubscription(subscription.stripeSubscriptionId, priceId);
+    
+    // Update local subscription
+    subscription.planType = planType;
+    await subscription.save();
+
+    res.json({
+      success: true,
+      message: `Successfully changed to ${planType} plan`,
+      subscription: subscription.toObject()
     });
   } catch (error) {
     console.error('Change plan error:', error);
@@ -206,19 +393,57 @@ router.post('/cancel', authenticateToken, async (req, res) => {
       return res.status(404).json({ success: false, message: 'No subscription found' });
     }
 
-    subscription.planType = 'free';
+    // Cancel Stripe subscription if exists
+    if (subscription.stripeSubscriptionId && stripeService) {
+      try {
+        await stripeService.cancelSubscription(subscription.stripeSubscriptionId);
+      } catch (stripeError) {
+        console.error('Error canceling Stripe subscription:', stripeError);
+        // Continue with local cancellation even if Stripe fails
+      }
+    }
+
+    subscription.planType = 'free_trial';
     subscription.status = 'cancelled';
     subscription.nextBillingDate = null;
     subscription.paymentMethodId = null;
+    subscription.stripeSubscriptionId = null;
     await subscription.save();
 
     res.json({
       success: true,
-      message: 'Subscription cancelled successfully. You have been moved to the free plan.'
+      message: 'Subscription cancelled successfully. You have been moved to the free trial.'
     });
   } catch (error) {
     console.error('Cancel subscription error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Stripe webhooks endpoint
+router.post('/webhooks', express.raw({type: 'application/json'}), async (req, res) => {
+  if (!stripe || !stripeService) {
+    return res.status(400).json({error: 'Stripe not configured'});
+  }
+
+  const sig = req.headers['stripe-signature'];
+  const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+  } catch (err) {
+    console.error('Webhook signature verification failed:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  try {
+    await stripeService.handleWebhook(event);
+    res.json({received: true});
+  } catch (error) {
+    console.error('Webhook handling failed:', error);
+    res.status(400).json({error: 'Webhook handling failed'});
   }
 });
 

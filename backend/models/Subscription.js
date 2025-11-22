@@ -9,14 +9,14 @@ const subscriptionSchema = new mongoose.Schema({
   },
   planType: {
     type: String,
-    enum: ['free', 'standard', 'premium'],
-    default: 'free',
+    enum: ['free_trial', 'free', 'standard', 'premium'],
+    default: 'free_trial',
     required: true
   },
   status: {
     type: String,
-    enum: ['active', 'inactive', 'cancelled', 'past_due'],
-    default: 'active',
+    enum: ['trial', 'active', 'inactive', 'cancelled', 'past_due', 'expired'],
+    default: 'trial',
     required: true
   },
   startDate: {
@@ -25,7 +25,19 @@ const subscriptionSchema = new mongoose.Schema({
   },
   endDate: {
     type: Date,
-    default: null
+    default: function() {
+      // Set trial end date to 30 days from now for free trial
+      if (this.planType === 'free_trial') {
+        return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      }
+      return null;
+    }
+  },
+  trialEndDate: {
+    type: Date,
+    default: function() {
+      return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
+    }
   },
   nextBillingDate: {
     type: Date,
@@ -121,6 +133,11 @@ subscriptionSchema.methods.canConnectMoreAccounts = function() {
 
 // Method to check if user can schedule more posts this week
 subscriptionSchema.methods.canScheduleMorePosts = function() {
+  // Check if subscription is expired first
+  if (this.isExpired()) {
+    return false;
+  }
+  
   // Reset weekly counter if needed
   const now = new Date();
   const weekStart = new Date(now.setDate(now.getDate() - now.getDay()));
@@ -134,9 +151,54 @@ subscriptionSchema.methods.canScheduleMorePosts = function() {
          this.usage.scheduledPostsThisWeek < this.limits.scheduledPostsPerWeek;
 };
 
+// Method to check if subscription is expired
+subscriptionSchema.methods.isExpired = function() {
+  const now = new Date();
+  
+  // Check if free trial has expired
+  if (this.planType === 'free_trial' && this.trialEndDate && now > this.trialEndDate) {
+    return true;
+  }
+  
+  // Check if paid subscription has expired
+  if (this.endDate && now > this.endDate) {
+    return true;
+  }
+  
+  return false;
+};
+
+// Method to get days remaining in trial
+subscriptionSchema.methods.getDaysRemaining = function() {
+  if (this.planType !== 'free_trial' || !this.trialEndDate) {
+    return 0;
+  }
+  
+  const now = new Date();
+  const diffTime = this.trialEndDate - now;
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  return Math.max(0, diffDays);
+};
+
+// Method to check if user can access app features
+subscriptionSchema.methods.hasActiveSubscription = function() {
+  return !this.isExpired() && (this.status === 'trial' || this.status === 'active');
+};
+
 // Method to get plan limits based on plan type
 subscriptionSchema.methods.updatePlanLimits = function() {
   switch (this.planType) {
+    case 'free_trial':
+      this.limits = {
+        socialAccounts: 2,
+        scheduledPostsPerWeek: 5,
+        analytics: 'basic',
+        support: 'community',
+        teamMembers: 1
+      };
+      this.price = 0;
+      break;
     case 'free':
       this.limits = {
         socialAccounts: 1,
@@ -181,6 +243,24 @@ subscriptionSchema.pre('save', function(next) {
 // Static method to get plan details
 subscriptionSchema.statics.getPlanDetails = function(planType) {
   const plans = {
+    free_trial: {
+      name: '30-Day Free Trial',
+      price: 0,
+      limits: {
+        socialAccounts: 2,
+        scheduledPostsPerWeek: 5,
+        analytics: 'basic',
+        support: 'community',
+        teamMembers: 1
+      },
+      features: [
+        '2 social media account connections',
+        '5 scheduled posts per week',
+        'Basic analytics',
+        'Community support',
+        '30 days free access'
+      ]
+    },
     free: {
       name: 'Free Plan',
       price: 0,

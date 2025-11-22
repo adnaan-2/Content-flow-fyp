@@ -89,6 +89,20 @@ const register = async (req, res) => {
 
     console.log('User created successfully:', newUser._id);
 
+    // Create free trial subscription for new user
+    try {
+      const Subscription = require('../models/Subscription');
+      await Subscription.create({
+        userId: newUser._id,
+        planType: 'free_trial',
+        status: 'trial'
+      });
+      console.log('Free trial subscription created for user:', newUser._id);
+    } catch (subscriptionError) {
+      console.error('Failed to create subscription:', subscriptionError);
+      // Don't fail registration due to subscription creation error
+    }
+
     // Send verification email (make this optional for testing)
     try {
       const emailResult = await sendVerificationEmail(email.toLowerCase(), name.trim(), verificationCode);

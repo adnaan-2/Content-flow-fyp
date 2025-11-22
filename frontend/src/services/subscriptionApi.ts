@@ -44,13 +44,46 @@ export const changeSubscriptionPlan = async (planType: 'free' | 'standard' | 'pr
   }
 };
 
-// Add payment method
-export const addPaymentMethod = async (paymentMethodId: string) => {
+// Check subscription status
+export const checkSubscriptionStatus = async () => {
   try {
-    const response = await api.post('/subscription/payment-method', { paymentMethodId });
+    const response = await api.get('/subscription/current');
+    return response.data.subscription;
+  } catch (error) {
+    console.error('Check subscription status error:', error);
+    throw error;
+  }
+};
+
+// Create Stripe checkout session
+export const createCheckoutSession = async (planType: 'standard' | 'premium') => {
+  try {
+    const response = await api.post('/subscription/create-checkout-session', { planType });
     return response.data;
   } catch (error) {
-    console.error('Add payment method error:', error);
+    console.error('Create checkout session error:', error);
+    throw error;
+  }
+};
+
+// Mock payment success for development
+export const mockPaymentSuccess = async (planType: 'standard' | 'premium') => {
+  try {
+    const response = await api.post('/subscription/mock-payment-success', { planType });
+    return response.data;
+  } catch (error) {
+    console.error('Mock payment success error:', error);
+    throw error;
+  }
+};
+
+// Verify checkout session
+export const verifyCheckout = async (sessionId: string) => {
+  try {
+    const response = await api.post('/subscription/verify-checkout', { sessionId });
+    return response.data;
+  } catch (error) {
+    console.error('Verify checkout error:', error);
     throw error;
   }
 };
@@ -93,7 +126,9 @@ export default {
   getAvailablePlans,
   checkSubscriptionLimits,
   changeSubscriptionPlan,
-  addPaymentMethod,
+  createCheckoutSession,
+  mockPaymentSuccess,
+  verifyCheckout,
   cancelSubscription,
   getBillingHistory,
   updateUsage

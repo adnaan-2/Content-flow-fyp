@@ -4,6 +4,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import SubscriptionGuard from "@/components/SubscriptionGuard";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 // Pages
@@ -54,7 +55,9 @@ function App() {
                 path="/dashboard"
                 element={
                   <ProtectedRoute>
-                    <DashboardLayout />
+                    <SubscriptionGuard>
+                      <DashboardLayout />
+                    </SubscriptionGuard>
                   </ProtectedRoute>
                 }
               >

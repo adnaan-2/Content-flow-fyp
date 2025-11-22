@@ -78,6 +78,10 @@ class AnalyticsApi {
       
       return response.data;
     } catch (error: any) {
+      // Handle subscription expired error
+      if (error.response?.status === 403 && error.response?.data?.subscriptionExpired) {
+        throw new Error('SUBSCRIPTION_EXPIRED');
+      }
       console.error('Analytics API Error:', error);
       throw new Error(error.response?.data?.error || 'Failed to fetch dashboard analytics');
     }

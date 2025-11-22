@@ -47,7 +47,46 @@ app.use(cors({
   exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar']
 }));
 
-// Body parser
+// Stripe webhook endpoint (MUST be before express.json() middleware)
+app.post('/webhook', express.raw({type: 'application/json'}), (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  let event;
+
+  try {
+    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+    event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+  } catch (err) {
+    console.log('⚠️  Webhook signature verification failed.', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  // Handle the event
+  switch (event.type) {
+    case 'checkout.session.completed':
+      console.log('✅ Checkout session completed:', event.data.object.id);
+      // Handle successful payment here
+      break;
+    case 'customer.subscription.created':
+      console.log('✅ Subscription created:', event.data.object.id);
+      // Update user subscription in database
+      break;
+    case 'invoice.payment_succeeded':
+      console.log('✅ Payment succeeded for invoice:', event.data.object.id);
+      break;
+    case 'customer.subscription.deleted':
+      console.log('❌ Subscription cancelled:', event.data.object.id);
+      // Handle subscription cancellation
+      break;
+    default:
+      console.log(`Unhandled event type ${event.type}`);
+  }
+
+  res.json({received: true});
+});
+
+// Body parser (AFTER webhook endpoint)
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
