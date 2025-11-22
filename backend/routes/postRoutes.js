@@ -25,6 +25,39 @@ router.post('/schedule', schedulePost);
 // GET /api/posts - Get user's posts
 router.get('/', getUserPosts);
 
+// GET /api/posts/analytics - Get posts with analytics
+router.get('/analytics', async (req, res) => {
+  try {
+    const Post = require('../models/Post');
+    const SocialAccount = require('../models/SocialAccount');
+    
+    const posts = await Post.find({ userId: req.user.id })
+      .populate('socialAccountId', 'platform accountName profilePicture')
+      .sort({ createdAt: -1 })
+      .limit(20);
+
+    // Format posts data for frontend
+    const postsWithAnalytics = posts.map(post => ({
+      _id: post._id,
+      platform: post.platform,
+      content: post.content,
+      status: post.status,
+      publishedTime: post.publishedTime,
+      scheduledTime: post.scheduledTime,
+      createdAt: post.createdAt,
+      analytics: post.analytics,
+      socialAccount: post.socialAccountId,
+      postId: post.postId,
+      errorMessage: post.errorMessage
+    }));
+
+    res.json({ success: true, posts: postsWithAnalytics });
+  } catch (error) {
+    console.error('Get posts analytics error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET /api/posts/scheduled - Get scheduled posts
 router.get('/scheduled', getScheduledPosts);
 
