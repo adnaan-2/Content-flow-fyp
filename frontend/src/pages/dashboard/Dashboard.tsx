@@ -241,7 +241,7 @@ const Dashboard = () => {
         <div className="flex-1 text-center py-12">
           <div className="max-w-md mx-auto">
             <div className="mb-6">
-              <Users className="h-24 w-24 text-gray-300 mx-auto mb-4" />
+              <Users className="h-24 w-24 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No Connected Accounts</h3>
               <p className="text-gray-600 dark:text-gray-400">
                 Connect your social media accounts to start viewing analytics and insights.
@@ -295,13 +295,13 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 flex items-center">
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center">
               <Users className="h-4 w-4 mr-1" />
               Total Followers
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">
+            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
               {formatNumber(data.totalMetrics.followers)}
             </div>
             <div className={`text-sm ${getGrowthTrend(data.growthMetrics.followersGrowth).color}`}>
@@ -312,13 +312,13 @@ const Dashboard = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 flex items-center">
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center">
               <Heart className="h-4 w-4 mr-1" />
               Total Likes
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">
+            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
               {formatNumber(data.totalMetrics.likes)}
             </div>
             <div className={`text-sm ${getGrowthTrend(data.growthMetrics.engagementGrowth).color}`}>
@@ -329,13 +329,13 @@ const Dashboard = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 flex items-center">
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center">
               <Eye className="h-4 w-4 mr-1" />
               Total Impressions
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">
+            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
               {formatNumber(data.totalMetrics.impressions)}
             </div>
             <div className={`text-sm ${getGrowthTrend(data.growthMetrics.reachGrowth).color}`}>
@@ -346,13 +346,13 @@ const Dashboard = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 flex items-center">
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center">
               <TrendingUp className="h-4 w-4 mr-1" />
               Avg. Engagement
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">
+            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
               {data.totalMetrics.avgEngagement.toFixed(1)}%
             </div>
             <div className={`text-sm ${getGrowthTrend(data.growthMetrics.engagementGrowth).color}`}>
@@ -380,33 +380,33 @@ const Dashboard = () => {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <div className="flex items-center space-x-2">
-                      <MessageCircle className="h-4 w-4 text-gray-500" />
-                      <span className="text-sm text-gray-600">Total Posts</span>
+                      <MessageCircle className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Total Comments</span>
                     </div>
                     <span className="font-semibold">{formatNumber(data.totalMetrics.posts)}</span>
                   </div>
                   
                   <div className="flex justify-between items-center">
                     <div className="flex items-center space-x-2">
-                      <MessageCircle className="h-4 w-4 text-gray-500" />
-                      <span className="text-sm text-gray-600">Total Comments</span>
+                      <MessageCircle className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Total Comments</span>
                     </div>
                     <span className="font-semibold">{formatNumber(data.totalMetrics.comments)}</span>
                   </div>
                   
                   <div className="flex justify-between items-center">
                     <div className="flex items-center space-x-2">
-                      <Share2 className="h-4 w-4 text-gray-500" />
-                      <span className="text-sm text-gray-600">Total Shares</span>
+                      <Share2 className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Total Shares</span>
                     </div>
                     <span className="font-semibold">{formatNumber(data.totalMetrics.shares)}</span>
                   </div>
 
                   <div className="pt-4 border-t">
-                    <div className="text-sm text-gray-600 mb-2">Time Range</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">Time Range</div>
                     <div className="font-medium">{timeRange.charAt(0).toUpperCase() + timeRange.slice(1)} View</div>
                     {data.dateRange && (
-                      <div className="text-xs text-gray-500 mt-1">
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         {new Date(data.dateRange.start).toLocaleDateString()} - {new Date(data.dateRange.end).toLocaleDateString()}
                       </div>
                     )}
@@ -553,7 +553,7 @@ const Dashboard = () => {
                         </div>
                         <div className="text-sm text-gray-600 dark:text-gray-400">@{account.accountName}</div>
                         {account.lastSync && (
-                          <div className="text-xs text-gray-500 dark:text-gray-500">
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
                             Last sync: {new Date(account.lastSync).toLocaleDateString()}
                           </div>
                         )}
@@ -562,7 +562,7 @@ const Dashboard = () => {
                     <div className="text-right space-y-2">
                       <div>
                         <div className="text-2xl font-bold">{formatNumber(account.metrics.followers)}</div>
-                        <div className="text-sm text-gray-600">followers</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">followers</div>
                       </div>
                       <div className="flex space-x-4 text-sm">
                         <div>

@@ -296,28 +296,6 @@ const GenerateAds = () => {
     }
   };
 
-  const handleDownload = async () => {
-    if (!generatedImage?.imageUrl) return;
-    
-    try {
-      const response = await fetch(generatedImage.imageUrl);
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `generated-ad-${Date.now()}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error("Error downloading image:", err);
-      setError("Failed to download image");
-    }
-  };
-
   return (
     <div className="h-[85vh] bg-gray-50 dark:bg-black text-gray-900 dark:text-gray-100 flex flex-col relative">
       {/* Background */}
@@ -374,33 +352,12 @@ const GenerateAds = () => {
             )}
             
             {generatedImage ? (
-              <div className="text-center w-full h-full flex flex-col items-center justify-center">
-                <div className="mb-6">
-                  <img
-                    src={generatedImage.imageUrl}
-                    alt="Generated Ad"
-                    className="max-w-md max-h-80 object-contain rounded-xl border border-gray-300 dark:border-gray-600 shadow-2xl"
-                  />
-                </div>
-                
-                <div className="flex gap-4 justify-center">
-                  <Button 
-                    onClick={handleDownload} 
-                    className="bg-gradient-to-r from-primary to-primary/80 hover:bg-primary/90 text-primary-foreground px-6 py-3 rounded-xl text-sm font-medium transition-all flex items-center gap-2 shadow-md"
-                  >
-                    <Download className="h-4 w-4" />
-                    Download
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    onClick={handleGenerate}
-                    disabled={isGenerating}
-                    className="bg-white dark:bg-background border-gray-300 dark:border-primary/20 text-gray-900 dark:text-foreground hover:bg-gray-50 dark:hover:bg-primary/10 hover:text-gray-900 dark:hover:text-foreground px-6 py-3 rounded-xl text-sm font-medium transition-all flex items-center gap-2"
-                  >
-                    <Sparkles className="h-4 w-4" />
-                    Regenerate
-                  </Button>
-                </div>
+              <div className="text-center w-full h-full flex items-center justify-center">
+                <img
+                  src={generatedImage.imageUrl}
+                  alt="Generated Ad"
+                  className="max-w-full max-h-full object-contain rounded-xl border border-gray-300 dark:border-gray-600 shadow-2xl"
+                />
               </div>
             ) : (
               <div className="text-center">
@@ -420,7 +377,7 @@ const GenerateAds = () => {
                   showCursor={true}
                   cursorCharacter="|"
                   cursorClassName="text-gray-900 dark:text-white text-6xl animate-pulse font-black"
-                  textColors={['#111827', '#111827', '#111827', '#111827', '#111827']}
+                  textColors={['currentColor', 'currentColor', 'currentColor', 'currentColor', 'currentColor']}
                 />
               </div>
             )}
@@ -502,7 +459,7 @@ const GenerateAds = () => {
                                       </div>
                                       <div className="text-left">
                                         <div className="text-xs">{category.name}</div>
-                                        <div className="text-xs text-gray-500">{category.description}</div>
+                                        <div className="text-xs text-gray-500 dark:text-gray-400">{category.description}</div>
                                       </div>
                                     </Button>
                                   );
@@ -563,7 +520,7 @@ const GenerateAds = () => {
                                     </div>
                                     <div className="text-left">
                                       <div className="text-xs">{size.name}</div>
-                                      <div className="text-xs text-gray-500">{size.ratio}</div>
+                                      <div className="text-xs text-gray-500 dark:text-gray-400">{size.ratio}</div>
                                     </div>
                                   </Button>
                                 ))}
@@ -633,7 +590,7 @@ const GenerateAds = () => {
           <div className="p-4 border-b border-gray-300 dark:border-gray-800">
             <div className="flex items-center gap-2 mb-2">
               <div className="w-4 h-4 bg-gray-300 dark:bg-gray-700 rounded-sm flex items-center justify-center">
-                <ImageIcon className="h-2 w-2 text-gray-600 dark:text-gray-400" />
+                <ImageIcon className="h-2 w-2 text-gray-600 dark:text-gray-300" />
               </div>
               <h3 className="text-xl font-medium text-gray-900 dark:text-white">History</h3>
             </div>
@@ -644,15 +601,15 @@ const GenerateAds = () => {
             {adsLoading ? (
               <div className="flex flex-col items-center justify-center py-4">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400 dark:border-gray-600 mb-1"></div>
-                <span className="text-xs text-gray-500 dark:text-gray-500">Loading...</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">Loading...</span>
               </div>
             ) : myAds.length === 0 ? (
               <div className="text-center py-4">
                 <div className="mx-auto w-8 h-8 mb-2">
-                  <ImageIcon className="h-8 w-8 text-gray-500 dark:text-gray-600" />
+                  <ImageIcon className="h-8 w-8 text-gray-500 dark:text-gray-400" />
                 </div>
-                <p className="text-gray-600 dark:text-gray-500 text-xs mb-1">No designs yet</p>
-                <p className="text-gray-500 dark:text-gray-600 text-xs">Create your first ad</p>
+                <p className="text-gray-600 dark:text-gray-400 text-xs mb-1">No designs yet</p>
+                <p className="text-gray-500 dark:text-gray-400 text-xs">Create your first ad</p>
               </div>
             ) : (
               <div 
@@ -727,7 +684,7 @@ const GenerateAds = () => {
                 </div>
                 {myAds.length > 12 && (
                   <div className="text-center mt-2">
-                    <p className="text-xs text-gray-500 dark:text-gray-600">+{myAds.length - 12} more</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">+{myAds.length - 12} more</p>
                   </div>
                 )}
               </div>
