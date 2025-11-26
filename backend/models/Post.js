@@ -29,6 +29,10 @@ const postSchema = new mongoose.Schema({
       default: 'text'
     }
   },
+  // Platform-specific URL for the post
+  platformUrl: {
+    type: String // Direct URL to view the post on the platform
+  },
   // Facebook specific
   facebookPageId: {
     type: String // For posting to specific Facebook pages

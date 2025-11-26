@@ -67,7 +67,7 @@ Return only the final caption text with hashtags, no explanations or additional 
 
     // Generate caption using Gemini - try AI Studio free tier models
     const modelNames = [
-      'gemini-2.0-flash-exp',
+      'gemini-2.5-flash',
       'gemini-1.5-flash',
       'gemini-1.5-pro'
     ];

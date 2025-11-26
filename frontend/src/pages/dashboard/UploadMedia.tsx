@@ -444,6 +444,19 @@ const UploadMedia = () => {
         description: `Posted to ${response.data.results.map(r => r.platform).join(", ")}` 
       });
 
+      // Trigger real-time post update for PostsSidebar
+      window.dispatchEvent(new CustomEvent('post-created', { 
+        detail: { 
+          platforms: response.data.results.map(r => r.platform),
+          postCount: response.data.results.length 
+        } 
+      }));
+      
+      // Also save to localStorage for cross-tab sync
+      localStorage.setItem('post_created', Date.now().toString());
+      
+      console.log('🚀 Post creation event triggered for real-time update');
+
       // Reset form
       setSelectedImages([]);
       setCaption('');
@@ -538,6 +551,20 @@ const UploadMedia = () => {
         title: "Post scheduled successfully!", 
         description: `Scheduled for ${scheduledDate.toLocaleDateString()} at ${scheduledTime} on ${response.data.platforms.join(", ")}` 
       });
+
+      // Trigger real-time post update for PostsSidebar (scheduled posts also appear in recent posts)
+      window.dispatchEvent(new CustomEvent('post-created', { 
+        detail: { 
+          platforms: response.data.platforms,
+          status: 'scheduled',
+          scheduledTime: scheduleDateTime.toISOString()
+        } 
+      }));
+      
+      // Also save to localStorage for cross-tab sync
+      localStorage.setItem('post_created', Date.now().toString());
+      
+      console.log('📅 Scheduled post creation event triggered for real-time update');
 
       // Reset form
       setSelectedImages([]);

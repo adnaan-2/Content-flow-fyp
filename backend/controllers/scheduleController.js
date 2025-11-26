@@ -1,7 +1,31 @@
 const ScheduledPost = require('../models/ScheduledPost');
+const Post = require('../models/Post');
 const SocialAccount = require('../models/SocialAccount');
 const schedule = require('node-schedule');
 const { postToSocialMedia, getSocialAccount } = require('./postController');
+
+// Helper function to generate platform URL (copied from postController)
+const generatePlatformUrl = (platform, postId, account) => {
+  if (!postId || postId === 'scheduled' || postId === 'failed') return null;
+  
+  switch (platform.toLowerCase()) {
+    case 'instagram':
+      if (!/^\d+$/.test(postId)) {
+        return `https://www.instagram.com/p/${postId}/`;
+      }
+      const username = account?.platformData?.username;
+      return username ? `https://www.instagram.com/${username}/` : null;
+    case 'facebook':
+      return `https://www.facebook.com/${postId}`;
+    case 'x':
+    case 'twitter':
+      return `https://twitter.com/i/web/status/${postId}`;
+    case 'linkedin':
+      return `https://www.linkedin.com/feed/update/${postId}`;
+    default:
+      return null;
+  }
+};
 
 // Store scheduled jobs
 const scheduledJobs = new Map();
@@ -28,8 +52,12 @@ const schedulePost = async (req, res) => {
       return res.status(400).json({ error: 'No platforms selected' });
     }
 
-    if (!caption) {
-      return res.status(400).json({ error: 'Caption is required' });
+    // Allow empty caption for Instagram if there's media
+    const hasMedia = mediaUrls && mediaUrls.length > 0;
+    const isInstagramOnly = platforms.length === 1 && platforms[0] === 'instagram';
+    
+    if (!caption && (!hasMedia || !isInstagramOnly)) {
+      return res.status(400).json({ error: 'Caption or media is required' });
     }
 
     if (!scheduledTime) {
@@ -54,16 +82,44 @@ const schedulePost = async (req, res) => {
 
     await scheduledPost.save();
 
+    // Also create Post entries for the sidebar to display
+    const postEntries = [];
+    for (const platform of platforms) {
+      try {
+        const account = await getSocialAccount(userId, platform);
+        if (account) {
+          const postEntry = new Post({
+            userId,
+            socialAccountId: account._id,
+            platform,
+            postId: 'scheduled',
+            content: {
+              text: caption || '',
+              mediaUrls: mediaUrls || [],
+              mediaType
+            },
+            scheduledTime: scheduleDate,
+            status: 'scheduled'
+          });
+          await postEntry.save();
+          postEntries.push(postEntry);
+        }
+      } catch (error) {
+        console.error(`Error creating Post entry for ${platform}:`, error);
+      }
+    }
+
     // Schedule the job
     const job = schedule.scheduleJob(scheduleDate, async () => {
-      await executeScheduledPost(scheduledPost._id);
+      await executeScheduledPost(scheduledPost._id, postEntries.map(p => p._id));
     });
 
     scheduledJobs.set(scheduledPost._id.toString(), job);
 
     res.json({
       message: 'Post scheduled successfully',
-      scheduledPost
+      scheduledPost,
+      postEntries: postEntries.length
     });
 
   } catch (error) {
@@ -73,7 +129,7 @@ const schedulePost = async (req, res) => {
 };
 
 // Execute scheduled post
-const executeScheduledPost = async (scheduledPostId) => {
+const executeScheduledPost = async (scheduledPostId, postEntryIds = []) => {
   try {
     const scheduledPost = await ScheduledPost.findById(scheduledPostId);
     if (!scheduledPost || scheduledPost.status !== 'pending') {
@@ -109,12 +165,45 @@ const executeScheduledPost = async (scheduledPostId) => {
           hasMedia: content.mediaUrls && content.mediaUrls.length > 0
         });
 
-        await postToSocialMedia(account, content, scheduledPost.facebookPageId);
-        results.push({ platform, status: 'success' });
+        const postId = await postToSocialMedia(account, content, scheduledPost.facebookPageId);
+        results.push({ platform, status: 'success', postId });
+
+        // Generate platform URL
+        const platformUrl = generatePlatformUrl(platform, postId, account);
+
+        // Update corresponding Post entry
+        await Post.findOneAndUpdate(
+          { 
+            userId: scheduledPost.user,
+            platform,
+            status: 'scheduled',
+            scheduledTime: scheduledPost.scheduledTime
+          },
+          {
+            postId,
+            platformUrl,
+            status: 'published',
+            publishedTime: new Date()
+          }
+        );
 
       } catch (error) {
         console.error(`Error posting to ${platform}:`, error);
         results.push({ platform, status: 'failed', error: error.message });
+        
+        // Update corresponding Post entry to failed
+        await Post.findOneAndUpdate(
+          { 
+            userId: scheduledPost.user,
+            platform,
+            status: 'scheduled',
+            scheduledTime: scheduledPost.scheduledTime
+          },
+          {
+            status: 'failed',
+            errorMessage: error.message
+          }
+        );
       }
     }
 

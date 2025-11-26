@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Bell, User, ChevronDown, Menu } from "lucide-react";
+import { User, ChevronDown, Menu } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/contexts/NotificationContext";
+import SimpleNotificationDropdown from "./SimpleNotificationDropdown";
 import { 
   Avatar, 
   AvatarFallback, 
@@ -16,7 +17,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 
 // Define the proper props interface with toggleSidebar
@@ -62,23 +62,7 @@ const DashboardHeader = ({ toggleSidebar }: DashboardHeaderProps) => {
       <div className="flex-1" />
       
       <div className="flex items-center space-x-4">
-        <div className="relative">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="relative" 
-            onClick={() => navigate('/dashboard/notifications')}
-          >
-            <Bell className="h-6 w-6" />
-            {unreadCount > 0 && (
-              <Badge 
-                className="absolute -top-1 -right-1 h-5 min-w-5 flex items-center justify-center text-xs bg-red-500 hover:bg-red-600 text-white rounded-full px-1"
-              >
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </Badge>
-            )}
-          </Button>
-        </div>
+        <SimpleNotificationDropdown unreadCount={unreadCount} />
         
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

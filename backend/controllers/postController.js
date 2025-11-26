@@ -689,6 +689,50 @@ const postToLinkedIn = async (account, content) => {
   }
 };
 
+// Helper function to generate platform URL
+const generatePlatformUrl = (platform, postId, account) => {
+  if (!postId || postId === 'scheduled' || postId === 'failed') return null;
+  
+  const platformData = account?.platformData || {};
+  const accountName = account?.accountName;
+  
+  switch (platform.toLowerCase()) {
+    case 'instagram':
+      // Use account username for Instagram post URL
+      const username = platformData.username || accountName;
+      if (!username) return null;
+      
+      // If postId looks like a shortcode, use direct URL
+      if (postId && !/^\d+$/.test(postId)) {
+        return `https://www.instagram.com/p/${postId}/`;
+      }
+      // For numeric IDs or when we can't get shortcode, return profile URL
+      return `https://www.instagram.com/${username}/`;
+      
+    case 'facebook':
+      // Use page ID or user ID from platformData
+      const fbUserId = platformData.id || platformData.userId;
+      if (fbUserId && postId) {
+        return `https://www.facebook.com/${fbUserId}/posts/${postId}`;
+      }
+      return `https://www.facebook.com/${postId}`;
+      
+    case 'x':
+    case 'twitter':
+      return `https://twitter.com/i/web/status/${postId}`;
+      
+    case 'linkedin':
+      // Use proper LinkedIn post URL format
+      if (postId.startsWith('urn:')) {
+        return `https://www.linkedin.com/feed/update/${postId}`;
+      }
+      return `https://www.linkedin.com/feed/update/urn:li:activity:${postId}`;
+      
+    default:
+      return null;
+  }
+};
+
 // Main posting function
 const postToSocialMedia = async (account, content, pageId = null) => {
   switch (account.platform) {
@@ -780,18 +824,31 @@ const postNow = async (req, res) => {
           platform === 'facebook' ? facebookPageId : null
         );
 
+        // Generate platform URL
+        const platformUrl = generatePlatformUrl(platform, postId, account);
+
         // Save post record
         const post = new Post({
           userId,
           socialAccountId: account._id,
           platform,
           postId,
+          platformUrl,
           content,
           publishedTime: new Date(),
-          status: 'published'
+          status: 'published',
+          analytics: {
+            likes: 0,
+            comments: 0,
+            shares: 0,
+            views: 0,
+            engagement: 0,
+            reach: 0
+          }
         });
 
         await post.save();
+        console.log('Post saved to database:', post._id);
         results.push({
           platform,
           postId,
@@ -1062,7 +1119,7 @@ const getUserPosts = async (req, res) => {
     if (platform) query.platform = platform;
 
     const posts = await Post.find(query)
-      .populate('socialAccountId', 'platform accountName')
+      .populate('socialAccountId', 'platform accountName platformData')
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);

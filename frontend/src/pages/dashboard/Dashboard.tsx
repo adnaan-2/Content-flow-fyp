@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { analyticsApi, type DashboardData } from "@/services/analyticsApi";
+import PostsSidebar from "@/components/dashboard/PostsSidebar";
 import {
   ChartContainer,
   ChartLegend,
@@ -35,8 +36,6 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Separator } from "@/components/ui/separator";
-import PostsSidebar from "@/components/dashboard/PostsSidebar";
 
 // Generate dynamic chart data based on real analytics
 const generateWeeklyData = (platforms: any[]) => {
@@ -204,9 +203,6 @@ const Dashboard = () => {
             ))}
           </div>
         </div>
-        <div className="w-80 flex-shrink-0">
-          <PostsSidebar />
-        </div>
       </div>
     );
   }
@@ -228,7 +224,7 @@ const Dashboard = () => {
           </Alert>
         </div>
         <div className="w-80 flex-shrink-0">
-          <PostsSidebar />
+          
         </div>
       </div>
     );
@@ -255,9 +251,7 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
-        <div className="w-80 flex-shrink-0">
-          <PostsSidebar />
-        </div>
+
       </div>
     );
   }
@@ -646,7 +640,7 @@ const Dashboard = () => {
       </Tabs>
       </div>
 
-      {/* Right Sidebar - Posts Analytics */}
+      {/* Posts Sidebar */}
       <div className="w-80 flex-shrink-0">
         <PostsSidebar />
       </div>
