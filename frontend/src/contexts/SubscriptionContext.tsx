@@ -1,7 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import subscriptionApi from '@/services/subscriptionApi';
+import { useAuth } from './AuthContext';
 
 interface SubscriptionData {
+  paymentMethodId: any;
+  billingHistory: any[];
   planType: string;
   status: string;
   endDate?: string;
@@ -33,6 +36,7 @@ interface SubscriptionProviderProps {
 }
 
 export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ children }) => {
+  const { isAuthenticated } = useAuth();
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -54,8 +58,18 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
   };
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setLoading(false);
+      // Set default basic plan for unauthenticated users
+      setSubscription({
+        planType: 'basic',
+        status: 'active'
+      });
+      return;
+    }
+    
     refreshSubscription();
-  }, []);
+  }, [isAuthenticated]);
 
   const currentPlan = subscription?.planType || 'basic';
   const isPro = currentPlan === 'pro_monthly' || currentPlan === 'pro_yearly';

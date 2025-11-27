@@ -50,7 +50,7 @@ const DashboardSidebar = ({ isOpen, toggleSidebar }: DashboardSidebarProps) => {
   const navItems = [
     { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
     { label: "Link Accounts", icon: LinkIcon, path: "/dashboard/link-accounts" },
-    { label: "Schedule Posts", icon: Calendar, path: "/dashboard/schedule" },
+    { label: "Calendar", icon: Calendar, path: "/dashboard/schedule" },
     { label: "Upload Posts", icon: Upload, path: "/dashboard/upload", premium: true },
     { label: "Generate Ads", icon: PlusCircle, path: "/dashboard/generate-ads", premium: true },
     { label: "Analytics", icon: BarChart3, path: "/dashboard/analytics" },
@@ -99,7 +99,7 @@ const DashboardSidebar = ({ isOpen, toggleSidebar }: DashboardSidebarProps) => {
                 className={`flex items-center px-4 py-3 rounded-xl transition-all ${
                   isActive(item.path) 
                     ? "bg-primary text-primary-foreground shadow-md" 
-                    : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                    : "hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white"
                 }`}
               >
                 <item.icon className={`${isOpen ? "mr-3" : "mx-auto"} h-5 w-5 ${isActive(item.path) ? "" : "text-muted-foreground"}`} />
@@ -161,21 +161,21 @@ const DashboardSidebar = ({ isOpen, toggleSidebar }: DashboardSidebarProps) => {
                 </div>
               </div>
               <Link to="/dashboard/subscription">
-                <Button variant="secondary" size="sm" className="w-full bg-primary/10 text-primary hover:bg-primary/20 border border-primary/30 text-sm h-8">
+                <Button variant="secondary" size="sm" className="w-full bg-white/20 text-white hover:bg-white/30 border border-white/30 text-sm h-8 font-medium">
                   View Plans
                 </Button>
               </Link>
             </Card>
           ) : (
-            <Card className="bg-gradient-to-r from-yellow-400 to-yellow-600 text-white border-0 p-4">
+            <Card className="bg-gradient-to-r from-purple-500 to-blue-600 text-white border-0 p-4 shadow-lg">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center space-x-2">
-                  <Crown className="w-4 h-4" />
+                  <Crown className="w-5 h-5" />
                   <span className="text-sm font-semibold">Pro Active</span>
                 </div>
               </div>
               <Link to="/dashboard/subscription">
-                <Button variant="secondary" size="sm" className="w-full bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20 border border-yellow-500/30 text-sm h-8">
+                <Button variant="secondary" size="sm" className="w-full bg-white/20 text-white hover:bg-white/30 border border-white/30 text-sm h-8 font-medium">
                   Manage Plan
                 </Button>
               </Link>

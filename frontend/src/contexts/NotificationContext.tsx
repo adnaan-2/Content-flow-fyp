@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import notificationApi, { Notification } from '../services/notificationApi';
+import { useAuth } from './AuthContext';
 
 interface NotificationContextType {
   notifications: Notification[];
@@ -16,6 +17,7 @@ interface NotificationContextType {
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 export const NotificationProvider = ({ children }: { children: ReactNode }) => {
+  const { isAuthenticated } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -125,6 +127,11 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 
   // Load notifications on mount and set up polling
   useEffect(() => {
+    if (!isAuthenticated) {
+      setLoading(false);
+      return;
+    }
+    
     refreshNotifications();
     
     // Poll for new notifications every 5 seconds for real-time updates
@@ -137,7 +144,7 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
       clearInterval(interval);
       delete (window as any).refreshNotifications;
     };
-  }, []);
+  }, [isAuthenticated]);
 
   const value: NotificationContextType = {
     notifications,

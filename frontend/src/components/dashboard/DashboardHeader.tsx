@@ -83,20 +83,35 @@ const DashboardHeader = ({ toggleSidebar }: DashboardHeaderProps) => {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-800 px-2">
               <Avatar className="h-8 w-8">
-                {(user?.profilePhoto || user?.profilePicture || user?.profileImage) ? (
-                  <AvatarImage 
-                    src={user.profilePhoto || user.profilePicture || user.profileImage} 
-                    alt={user?.name || "User"} 
-                    onError={(e) => {
-                      // Hide the image and show fallback if it fails to load
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
-                ) : (
-                  <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
-                    {getInitials(user?.name || "User")}
-                  </AvatarFallback>
-                )}
+                {(() => {
+                  // Get the profile picture URL, filtering out invalid values
+                  const profileUrl = user?.profilePhoto || user?.profilePicture || user?.profileImage;
+                  const isValidUrl = profileUrl && 
+                    profileUrl !== 'default-avatar.png' && 
+                    profileUrl !== '' &&
+                    (profileUrl.startsWith('http://') || profileUrl.startsWith('https://'));
+                  
+                  if (isValidUrl) {
+                    return (
+                      <>
+                        <AvatarImage 
+                          src={profileUrl} 
+                          alt={user?.name || "User"}
+                          className="object-cover"
+                        />
+                        <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
+                          {getInitials(user?.name || "User")}
+                        </AvatarFallback>
+                      </>
+                    );
+                  }
+                  
+                  return (
+                    <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
+                      {getInitials(user?.name || "User")}
+                    </AvatarFallback>
+                  );
+                })()}
               </Avatar>
               <div className="hidden sm:block text-left">
                 <div className="text-sm font-medium leading-none">
