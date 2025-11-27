@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 
 import { mediaService, adService, postService } from '@/services/api';
+import { SubscriptionGuard } from "@/components/SubscriptionGuard";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from "@/components/ui/card";
@@ -637,7 +638,8 @@ const UploadMedia = () => {
   };
 
   return (
-    <div className="space-y-8">
+    <SubscriptionGuard feature="posts">
+      <div className="space-y-8">
       <h1 className="text-3xl font-bold tracking-tight">Upload & Generate Media</h1>
       <p className="text-muted-foreground mb-4">Import media, generate content, and post to social platforms.</p>
 
@@ -1012,7 +1014,8 @@ const UploadMedia = () => {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </SubscriptionGuard>
   );
 };
 

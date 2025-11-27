@@ -3,8 +3,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
-import SubscriptionGuard from "@/components/SubscriptionGuard";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 // Pages
@@ -35,7 +35,8 @@ function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <NotificationProvider>
+        <SubscriptionProvider>
+          <NotificationProvider>
           <TooltipProvider>
           <Router>
             <Routes>
@@ -55,9 +56,7 @@ function App() {
                 path="/dashboard"
                 element={
                   <ProtectedRoute>
-                    <SubscriptionGuard>
-                      <DashboardLayout />
-                    </SubscriptionGuard>
+                    <DashboardLayout />
                   </ProtectedRoute>
                 }
               >
@@ -80,8 +79,9 @@ function App() {
           </Router>
           <Toaster />
         </TooltipProvider>
-      </NotificationProvider>
-    </AuthProvider>
+          </NotificationProvider>
+        </SubscriptionProvider>
+      </AuthProvider>
     </ThemeProvider>
   );
 }

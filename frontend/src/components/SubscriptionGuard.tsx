@@ -1,122 +1,129 @@
-import React, { useState, useEffect } from 'react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React from 'react';
 import { Badge } from '@/components/ui/badge';
-import { AlertTriangle, Clock, CreditCard, Zap } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Crown, Lock, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import subscriptionApi from '@/services/subscriptionApi';
+import { useSubscription } from '@/contexts/SubscriptionContext';
 
-interface SubscriptionStatus {
-  planType: string;
-  status: string;
-  isExpired: boolean;
-  hasActiveSubscription: boolean;
-  daysRemaining: number;
-  trialEndDate?: string;
+interface SubscriptionGuardProps {
+  children: React.ReactNode;
+  feature: 'posts' | 'ads' | 'analytics';
+  className?: string;
 }
 
-const SubscriptionGuard = ({ children }: { children: React.ReactNode }) => {
-  const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
-  const [loading, setLoading] = useState(true);
+export const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ 
+  children, 
+  feature, 
+  className = '' 
+}) => {
   const navigate = useNavigate();
-
-  useEffect(() => {
-    checkSubscriptionStatus();
-  }, []);
-
-  const checkSubscriptionStatus = async () => {
-    try {
-      const response = await subscriptionApi.getCurrentSubscription();
-      setSubscription(response.subscription);
-    } catch (error) {
-      console.error('Failed to check subscription status:', error);
-    } finally {
-      setLoading(false);
+  const { subscription, loading } = useSubscription();
+  
+  // Show loading state
+  if (loading) {
+    return (
+      <div className={className}>
+        {children}
+      </div>
+    );
+  }
+  
+  const currentPlan = subscription?.planType || 'basic';
+  
+  // Check if user has access to the feature
+  const hasAccess = currentPlan === 'pro_monthly' || currentPlan === 'pro_yearly';
+  
+  const getFeatureTitle = () => {
+    switch (feature) {
+      case 'posts':
+        return 'Post Creation & Scheduling';
+      case 'ads':
+        return 'AI Ad Generation';
+      case 'analytics':
+        return 'Advanced Analytics';
+      default:
+        return 'Premium Feature';
+    }
+  };
+  
+  const getFeatureDescription = () => {
+    switch (feature) {
+      case 'posts':
+        return 'Create and schedule posts across all your social media platforms';
+      case 'ads':
+        return 'Generate AI-powered advertisements for your social media campaigns';
+      case 'analytics':
+        return 'Access detailed analytics and insights for your social media performance';
+      default:
+        return 'This feature requires a Pro subscription';
     }
   };
 
-  const handleUpgradeClick = () => {
-    navigate('/dashboard/subscription');
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
   // If subscription is expired, show upgrade prompt
-  if (subscription && subscription.isExpired && !subscription.hasActiveSubscription) {
+  if (hasAccess) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 p-3 bg-orange-100 dark:bg-orange-900/20 rounded-full w-fit">
-              <AlertTriangle className="h-8 w-8 text-orange-600" />
-            </div>
-            <CardTitle className="text-2xl">Subscription Expired</CardTitle>
-            <p className="text-muted-foreground">
-              Your {subscription.planType === 'free_trial' ? '30-day free trial has' : 'subscription has'} expired.
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Alert className="border-orange-200 bg-orange-50 dark:bg-orange-900/10">
-              <AlertTriangle className="h-4 w-4 text-orange-600" />
-              <AlertDescription>
-                To continue using all features, please upgrade to a paid plan.
-              </AlertDescription>
-            </Alert>
-            
-            <div className="space-y-3">
-              <Button 
-                onClick={handleUpgradeClick}
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold"
-                size="lg"
-              >
-                <CreditCard className="h-4 w-4 mr-2" />
-                Upgrade Now
-              </Button>
-              
-              <div className="text-center text-sm text-muted-foreground">
-                Choose from our flexible plans starting at $10/month
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className={className}>
+        {children}
       </div>
     );
   }
-
-  // Show trial warning if less than 7 days remaining
-  const showTrialWarning = subscription && 
-    subscription.planType === 'free_trial' && 
-    subscription.daysRemaining <= 7 && 
-    subscription.daysRemaining > 0;
 
   return (
-    <div className="relative">
-      {showTrialWarning && (
-        <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white p-3 text-center">
-          <div className="flex items-center justify-center space-x-2">
-            <Clock className="h-4 w-4" />
-            <span className="font-medium">
-              Free trial ends in {subscription.daysRemaining} day{subscription.daysRemaining !== 1 ? 's' : ''}!
-            </span>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleUpgradeClick}
-              className="ml-2 bg-white text-orange-600 hover:bg-gray-100"
-            >
-              Upgrade Now
-            </Button>
-          </div>
+    <div className={`relative ${className}`}>
+      {/* Premium Badge */}
+      <div className="absolute top-4 right-4 z-10">
+        <Badge className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-3 py-1">
+          <Crown className="h-3 w-3 mr-1" />
+          PREMIUM
+        </Badge>
+      </div>
+      
+      {/* Blurred Content */}
+      <div className="relative">
+        <div className="filter blur-sm pointer-events-none opacity-30">
+          {children}
         </div>
-      )}
-      {children}
+        
+        {/* Overlay */}
+        <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <Card className="w-full max-w-md mx-4 border-0 shadow-xl">
+            <CardHeader className="text-center">
+              <div className="mx-auto w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center mb-4">
+                <Crown className="h-8 w-8 text-white" />
+              </div>
+              <CardTitle className="text-xl">{getFeatureTitle()}</CardTitle>
+              <CardDescription className="text-muted-foreground">
+                {getFeatureDescription()}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground mb-6">
+                  {currentPlan === 'basic' 
+                    ? 'Unlock powerful content creation tools with Pro' 
+                    : 'Your Pro subscription has expired. Renew to continue'
+                  }
+                </p>
+                
+                <div className="space-y-3">
+                  <Button 
+                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-3"
+                    onClick={() => navigate('/dashboard/subscription')}
+                  >
+                    <Zap className="h-4 w-4 mr-2" />
+                    Upgrade to Pro
+                  </Button>
+                  
+                  <div className="text-xs text-muted-foreground">
+                    Plans starting from 5 USDT/month
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 };

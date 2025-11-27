@@ -181,7 +181,17 @@ class StripeService {
 
   async updateUserSubscriptionFromStripe(userId, stripeSubscriptionId) {
     try {
+      console.log('Updating subscription from Stripe for user:', userId, 'subscription:', stripeSubscriptionId);
+      
       const stripeSubscription = await this.stripe.subscriptions.retrieve(stripeSubscriptionId);
+      console.log('Retrieved Stripe subscription:', {
+        id: stripeSubscription.id,
+        status: stripeSubscription.status,
+        current_period_start: stripeSubscription.current_period_start,
+        current_period_end: stripeSubscription.current_period_end,
+        items: stripeSubscription.items?.data?.[0]?.price?.id
+      });
+      
       let userSubscription = await Subscription.findOne({ userId });
       
       if (!userSubscription) {
@@ -189,18 +199,55 @@ class StripeService {
       }
 
       // Map Stripe price ID to plan type
-      const priceId = stripeSubscription.items.data[0].price.id;
-      let planType = 'standard';
-      if (priceId === process.env.STRIPE_PREMIUM_PRICE_ID) {
-        planType = 'premium';
+      const priceId = stripeSubscription.items?.data?.[0]?.price?.id;
+      let planType = 'pro_monthly'; // Default to monthly
+      
+      console.log('Mapping price ID to plan type:', priceId);
+      
+      // Map based on price IDs (you'll need to create these in Stripe for production)
+      if (priceId === process.env.STRIPE_PRO_MONTHLY_PRICE_ID) {
+        planType = 'pro_monthly';
+      } else if (priceId === process.env.STRIPE_PRO_YEARLY_PRICE_ID) {
+        planType = 'pro_yearly';
+      } else {
+        // If we can't match the price ID, determine by interval
+        const interval = stripeSubscription.items?.data?.[0]?.price?.recurring?.interval;
+        planType = interval === 'year' ? 'pro_yearly' : 'pro_monthly';
+        console.log('Using interval-based mapping:', interval, '->', planType);
       }
 
       userSubscription.planType = planType;
       userSubscription.status = stripeSubscription.status === 'active' ? 'active' : stripeSubscription.status;
       userSubscription.stripeSubscriptionId = stripeSubscriptionId;
       userSubscription.stripeCustomerId = stripeSubscription.customer;
-      userSubscription.currentPeriodStart = new Date(stripeSubscription.current_period_start * 1000);
-      userSubscription.currentPeriodEnd = new Date(stripeSubscription.current_period_end * 1000);
+      
+      // Safely convert Stripe timestamps to dates with validation
+      const currentPeriodStart = stripeSubscription.current_period_start;
+      const currentPeriodEnd = stripeSubscription.current_period_end;
+      
+      if (currentPeriodStart && !isNaN(currentPeriodStart)) {
+        userSubscription.startDate = new Date(currentPeriodStart * 1000);
+      } else {
+        userSubscription.startDate = new Date(); // Default to now
+      }
+      
+      if (currentPeriodEnd && !isNaN(currentPeriodEnd)) {
+        userSubscription.endDate = new Date(currentPeriodEnd * 1000);
+        userSubscription.nextBillingDate = new Date(currentPeriodEnd * 1000);
+      } else {
+        // Default billing period (1 month from now)
+        const nextBilling = new Date();
+        if (planType === 'pro_yearly') {
+          nextBilling.setFullYear(nextBilling.getFullYear() + 1);
+        } else {
+          nextBilling.setMonth(nextBilling.getMonth() + 1);
+        }
+        userSubscription.endDate = nextBilling;
+        userSubscription.nextBillingDate = nextBilling;
+      }
+      
+      // Update plan limits based on new plan type
+      userSubscription.updatePlanLimits();
       
       await userSubscription.save();
     } catch (error) {
@@ -219,6 +266,70 @@ class StripeService {
       return prices.data;
     } catch (error) {
       console.error('Error getting prices:', error);
+      throw error;
+    }
+  }
+
+  // Create or get price for ContentFlow Pro plans
+  async getOrCreatePrice(planType) {
+    try {
+      let priceAmount, interval;
+      
+      if (planType === 'pro_monthly') {
+        priceAmount = 500; // 5 USD in cents
+        interval = 'month';
+      } else if (planType === 'pro_yearly') {
+        priceAmount = 4000; // 40 USD in cents  
+        interval = 'year';
+      } else {
+        throw new Error('Invalid plan type for price creation');
+      }
+
+      // First, check if we already have a product for ContentFlow
+      const products = await this.stripe.products.list({
+        limit: 100,
+      });
+      
+      let product = products.data.find(p => p.name === 'ContentFlow Pro');
+      
+      if (!product) {
+        // Create the product
+        product = await this.stripe.products.create({
+          name: 'ContentFlow Pro',
+          description: 'ContentFlow Pro subscription with unlimited posting and ad generation',
+          type: 'service',
+        });
+        console.log('Created Stripe product:', product.id);
+      }
+
+      // Check if price already exists for this interval
+      const prices = await this.stripe.prices.list({
+        product: product.id,
+        active: true,
+      });
+      
+      let price = prices.data.find(p => 
+        p.recurring?.interval === interval && 
+        p.unit_amount === priceAmount
+      );
+      
+      if (!price) {
+        // Create the price
+        price = await this.stripe.prices.create({
+          product: product.id,
+          unit_amount: priceAmount,
+          currency: 'usd',
+          recurring: {
+            interval: interval,
+          },
+          nickname: `ContentFlow Pro ${interval === 'month' ? 'Monthly' : 'Yearly'}`,
+        });
+        console.log('Created Stripe price:', price.id);
+      }
+
+      return price.id;
+    } catch (error) {
+      console.error('Error creating/getting Stripe price:', error);
       throw error;
     }
   }

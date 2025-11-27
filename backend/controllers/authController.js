@@ -94,7 +94,7 @@ const register = async (req, res) => {
       const Subscription = require('../models/Subscription');
       await Subscription.create({
         userId: newUser._id,
-        planType: 'free_trial',
+        planType: 'basic',
         status: 'trial'
       });
       console.log('Free trial subscription created for user:', newUser._id);

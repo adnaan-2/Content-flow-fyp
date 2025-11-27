@@ -34,12 +34,23 @@ export const checkSubscriptionLimits = async (action: 'connect-account' | 'sched
 };
 
 // Change subscription plan
-export const changeSubscriptionPlan = async (planType: 'free' | 'standard' | 'premium') => {
+export const changeSubscriptionPlan = async (planType: 'basic' | 'pro_monthly' | 'pro_yearly') => {
   try {
     const response = await api.post('/subscription/change-plan', { planType });
     return response.data;
   } catch (error) {
     console.error('Change plan error:', error);
+    throw error;
+  }
+};
+
+// Upgrade to pro plan (creates Stripe checkout session)
+export const upgradeToPro = async (planType: 'pro_monthly' | 'pro_yearly') => {
+  try {
+    const response = await api.post('/subscription/create-checkout-session', { planType });
+    return response.data;
+  } catch (error) {
+    console.error('Upgrade error:', error);
     throw error;
   }
 };
@@ -56,7 +67,7 @@ export const checkSubscriptionStatus = async () => {
 };
 
 // Create Stripe checkout session
-export const createCheckoutSession = async (planType: 'standard' | 'premium') => {
+export const createCheckoutSession = async (planType: 'pro_monthly' | 'pro_yearly') => {
   try {
     const response = await api.post('/subscription/create-checkout-session', { planType });
     return response.data;
@@ -67,7 +78,7 @@ export const createCheckoutSession = async (planType: 'standard' | 'premium') =>
 };
 
 // Mock payment success for development
-export const mockPaymentSuccess = async (planType: 'standard' | 'premium') => {
+export const mockPaymentSuccess = async (planType: 'pro_monthly' | 'pro_yearly') => {
   try {
     const response = await api.post('/subscription/mock-payment-success', { planType });
     return response.data;

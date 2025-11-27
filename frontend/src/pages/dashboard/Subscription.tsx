@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Check, Star, CreditCard, Calendar, DollarSign, Shield, Users, BarChart, Zap, Globe, Loader } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import subscriptionApi from "@/services/subscriptionApi";
 
 interface Plan {
@@ -46,7 +47,8 @@ interface SubscriptionData {
 const Subscription = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [currentSubscription, setCurrentSubscription] = useState<SubscriptionData | null>(null);
+  const { subscription, refreshSubscription } = useSubscription();
+  // Using global subscription from context instead of local state
   const [availablePlans, setAvailablePlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [upgrading, setUpgrading] = useState<string | null>(null);
@@ -110,12 +112,11 @@ const Subscription = () => {
   const loadSubscriptionData = async () => {
     try {
       setLoading(true);
-      const [subscriptionResponse, plansResponse] = await Promise.all([
-        subscriptionApi.getCurrentSubscription(),
-        subscriptionApi.getAvailablePlans()
-      ]);
+      // Use global refresh instead of local state
+      refreshSubscription();
       
-      setCurrentSubscription(subscriptionResponse.subscription);
+      // Only load plans since subscription is now in global state
+      const plansResponse = await subscriptionApi.getAvailablePlans();
       setAvailablePlans(plansResponse.plans);
     } catch (error) {
       console.error('Failed to load subscription data:', error);
@@ -143,31 +144,32 @@ const Subscription = () => {
         return;
       }
       
-      // If it's free trial, show message
-      if (planId === 'free_trial') {
+      // Basic plan is free downgrade - should happen automatically when subscription expires
+      if (planId === 'basic') {
         toast({
-          title: "Free Trial",
-          description: "You are already on the free trial. Upgrade to a paid plan for more features.",
+          title: "Basic Plan",
+          description: "Basic plan is automatically activated when your Pro subscription expires. You cannot manually downgrade during an active subscription.",
           variant: "default"
         });
         return;
       }
       
-      // For paid plans, create checkout session
-      if (planId === 'standard' || planId === 'premium') {
+      // For Pro plans, create checkout session
+      if (planId === 'pro_monthly' || planId === 'pro_yearly') {
+        const selectedPlan = plans.find(p => p.id === planId);
         const response = await subscriptionApi.createCheckoutSession(planId);
         
         if (response.mock) {
           // Handle mock payment for development
           const confirmPayment = window.confirm(
-            `This is a development environment. Simulate payment for ${planId} plan?`
+            `This is a development environment. Simulate payment for ${selectedPlan?.name} - ${selectedPlan?.price} ${selectedPlan?.currency}?`
           );
           
           if (confirmPayment) {
             const mockResponse = await subscriptionApi.mockPaymentSuccess(planId);
             toast({
-              title: "Success",
-              description: mockResponse.message,
+              title: "Payment Successful",
+              description: `Successfully upgraded to ${selectedPlan?.name}`,
             });
             await loadSubscriptionData();
           }
@@ -195,6 +197,7 @@ const Subscription = () => {
         description: response.message,
       });
       await loadSubscriptionData();
+      await refreshSubscription(); // Refresh global context
     } catch (error: any) {
       toast({
         title: "Error",
@@ -225,66 +228,69 @@ const Subscription = () => {
 
   const plans = [
     {
-      id: "free_trial",
-      name: "30-Day Free Trial",
+      id: "basic",
+      name: "Basic Plan",
       price: 0,
-      interval: "30 days",
-      description: "Perfect for getting started",
+      interval: "forever",
+      description: "Free forever with limited access",
       features: [
-        "2 social media account connections",
-        "5 scheduled posts per week",
+        "Social media account connections",
         "Basic analytics",
-        "Community support",
-        "30 days free access"
+        "Community support"
       ],
       limitations: [
-        "Trial expires after 30 days",
-        "Limited to basic features"
+        "Cannot create or schedule posts",
+        "Cannot generate ads",
+        "Limited features only"
       ],
       isPopular: false,
-      color: "border-green-300"
+      color: "border-gray-400",
+      restricted: true
     },
     {
-      id: "standard",
-      name: "Standard Plan",
-      price: 10,
+      id: "pro_monthly",
+      name: "Pro Plan (Monthly)",
+      price: 5,
       interval: "month",
-      description: "Ideal for growing creators",
+      currency: "USDT",
+      description: "Full access with monthly billing",
       features: [
-        "4 social media accounts (1 per platform)",
-        "8 scheduled posts per week",
+        "Unlimited social media accounts",
+        "Unlimited scheduled posts",
+        "AI Ad Generation",
         "Advanced analytics",
-        "Priority support"
+        "Premium support"
       ],
-      limitations: [
-        "1 Facebook, 1 Instagram, 1 LinkedIn, 1 X account only"
-      ],
+      limitations: [],
       isPopular: true,
       color: "border-blue-500"
     },
     {
-      id: "premium",
-      name: "Premium Plan",
-      price: 25,
-      interval: "month",
-      description: "For teams, organizations, and businesses",
+      id: "pro_yearly",
+      name: "Pro Plan (Yearly)",
+      price: 40,
+      interval: "year",
+      currency: "USDT",
+      description: "Full access with yearly billing - Save 33%",
       features: [
         "Unlimited social media accounts",
-        "Unlimited scheduled posts",
-        "Custom analytics reports",
-        "24/7 premium support",
-        "Unlimited team members"
+        "Unlimited scheduled posts", 
+        "AI Ad Generation",
+        "Advanced analytics",
+        "Premium support",
+        "Save 33% vs monthly plan"
       ],
       limitations: [],
       isPopular: false,
-      color: "border-purple-500"
+      color: "border-purple-500",
+      savings: "Best Value"
     }
   ];
 
-  const currentPlan = currentSubscription?.planType || 'free';
-  const hasPaymentMethod = currentSubscription?.paymentMethodId ? true : false;
+  const currentPlan = subscription?.planType || 'free';
+  const hasPaymentMethod = subscription?.paymentMethodId ? true : false;
   const currentPlanDetails = plans.find(p => p.id === currentPlan);
-  const billingHistory = currentSubscription?.billingHistory || [];
+  const billingHistory = subscription?.billingHistory || [];
 
   return (
     <div className="container mx-auto py-8 px-4 animate-fade-in">
@@ -310,6 +316,14 @@ const Subscription = () => {
               </div>
             )}
 
+            {plan.savings && (
+              <div className="absolute -top-3 left-4">
+                <Badge className="bg-green-600 text-white px-3 py-1">
+                  {plan.savings}
+                </Badge>
+              </div>
+            )}
+
             {currentPlan === plan.id && (
               <div className="absolute -top-3 right-4">
                 <Badge className="bg-green-600 text-white">
@@ -327,8 +341,14 @@ const Subscription = () => {
               <CardTitle className="text-2xl font-bold text-white">{plan.name}</CardTitle>
               <CardDescription className="text-sm text-gray-300">{plan.description}</CardDescription>
               <div className="mt-4">
-                <span className="text-4xl font-bold text-white">{plan.price}$</span>
+                <span className="text-4xl font-bold text-white">{plan.price}</span>
+                <span className="text-2xl font-bold text-white ml-1">{plan.currency || 'USDT'}</span>
                 <span className="text-gray-300 text-lg">/{plan.interval}</span>
+                {plan.id === "pro_yearly" && (
+                  <div className="text-sm text-green-400 mt-1">
+                    Save 33% vs monthly
+                  </div>
+                )}
               </div>
             </CardHeader>
 
@@ -373,19 +393,19 @@ const Subscription = () => {
                     disabled
                   >
                     <Check className="h-4 w-4 mr-2" />
-                    Plan Active
+                    Current Plan
                   </Button>
                 ) : (
                   <Button 
                     className={`w-full ${
-                      plan.isPopular 
+                      plan.id === "basic"
+                        ? "bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700"
+                        : plan.isPopular 
                         ? "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700" 
-                        : plan.id === "free_trial"
-                        ? "bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
                         : "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
                     } text-white font-semibold`}
                     onClick={() => handleUpgrade(plan.id)}
-                    disabled={upgrading === plan.id}
+                    disabled={upgrading === plan.id || plan.id === "basic"}
                   >
                     {upgrading === plan.id ? (
                       <>
@@ -394,10 +414,10 @@ const Subscription = () => {
                       </>
                     ) : (
                       <>
-                        {plan.id === "free_trial" ? (
+                        {plan.id === "basic" ? (
                           <>
-                            <Zap className="h-4 w-4 mr-2" />
-                            Start Free Trial
+                            <Check className="h-4 w-4 mr-2" />
+                            Downgrade Plan
                           </>
                         ) : (
                           <>

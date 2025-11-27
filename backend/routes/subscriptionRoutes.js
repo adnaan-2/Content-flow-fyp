@@ -12,19 +12,55 @@ router.get('/current', authenticateToken, async (req, res) => {
   try {
     let subscription = await Subscription.findOne({ userId: req.user.id });
     
-    // Create default free trial subscription if none exists
+    // Migrate old plan types to new ones
+    if (subscription && !['basic', 'pro_monthly', 'pro_yearly'].includes(subscription.planType)) {
+      console.log(`Migrating subscription from ${subscription.planType} to pro_monthly for user ${req.user.id}`);
+      
+      // Map old plan types to new ones
+      const migrationMap = {
+        'free': 'basic',
+        'free_trial': 'basic', 
+        'standard': 'pro_monthly',
+        'premium': 'pro_yearly'
+      };
+      
+      subscription.planType = migrationMap[subscription.planType] || 'basic';
+      subscription.updatePlanLimits();
+      await subscription.save();
+      console.log(`Successfully migrated to ${subscription.planType}`);
+    }
+    
+    // Create default Pro monthly trial subscription for new users
     if (!subscription) {
+      const trialEndDate = new Date();
+      trialEndDate.setMonth(trialEndDate.getMonth() + 1); // 1 month trial
+      
       subscription = new Subscription({
         userId: req.user.id,
-        planType: 'free_trial',
-        status: 'trial'
+        planType: 'pro_monthly',
+        status: 'active',
+        startDate: new Date(),
+        endDate: trialEndDate,
+        price: 0, // Free for trial month
+        limits: {
+          socialAccounts: -1,
+          scheduledPostsPerWeek: -1,
+          analytics: 'advanced',
+          support: 'premium',
+          teamMembers: 1,
+          canCreatePosts: true,
+          canGenerateAds: true
+        }
       });
       await subscription.save();
     }
     
-    // Check if subscription is expired and update status
-    if (subscription.isExpired()) {
-      subscription.status = 'expired';
+    // Check if subscription is expired and downgrade to basic
+    if (subscription.isExpired() && subscription.planType !== 'basic') {
+      subscription.planType = 'basic';
+      subscription.status = 'active';
+      subscription.endDate = null; // Basic plan has no expiration
+      subscription.updatePlanLimits();
       await subscription.save();
     }
 
@@ -58,16 +94,16 @@ router.get('/plans', async (req, res) => {
   try {
     const plans = [
       {
-        id: 'free',
-        ...Subscription.getPlanDetails('free')
+        id: 'basic',
+        ...Subscription.getPlanDetails('basic')
       },
       {
-        id: 'standard',
-        ...Subscription.getPlanDetails('standard')
+        id: 'pro_monthly',
+        ...Subscription.getPlanDetails('pro_monthly')
       },
       {
-        id: 'premium',
-        ...Subscription.getPlanDetails('premium')
+        id: 'pro_yearly',
+        ...Subscription.getPlanDetails('pro_yearly')
       }
     ];
 
@@ -133,10 +169,10 @@ router.post('/create-checkout-session', authenticateToken, async (req, res) => {
   try {
     const { planType } = req.body;
     
-    if (!['standard', 'premium'].includes(planType)) {
+    if (!['pro_monthly', 'pro_yearly'].includes(planType)) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Invalid plan type. Only standard and premium plans require payment.' 
+        message: 'Invalid plan type. Only pro monthly and yearly plans require payment.' 
       });
     }
 
@@ -149,15 +185,15 @@ router.post('/create-checkout-session', authenticateToken, async (req, res) => {
     if (!subscription) {
       subscription = new Subscription({
         userId: req.user.id,
-        planType: 'free_trial',
-        status: 'trial'
+        planType: 'basic',
+        status: 'active'
       });
       await subscription.save();
     }
 
-    // Check if Stripe is configured
-    if (!stripeService || !stripe) {
-      // Mock checkout for development/testing
+    // Check if Stripe is properly configured
+    if (!process.env.STRIPE_SECRET_KEY) {
+      console.log('Stripe not configured, using mock payment');
       return res.json({
         success: true,
         checkoutUrl: `${process.env.FRONTEND_URL}/dashboard/subscription?mock=true&plan=${planType}`,
@@ -165,6 +201,8 @@ router.post('/create-checkout-session', authenticateToken, async (req, res) => {
         mock: true
       });
     }
+    
+    console.log('Using real Stripe checkout for plan:', planType);
 
     // Create or get Stripe customer
     let stripeCustomerId = subscription.stripeCustomerId;
@@ -183,32 +221,55 @@ router.post('/create-checkout-session', authenticateToken, async (req, res) => {
       console.log('Created Stripe customer:', stripeCustomerId);
     }
 
-    // Get the correct price ID based on plan
-    const priceId = planType === 'standard' 
-      ? process.env.STRIPE_STANDARD_PRICE_ID 
-      : process.env.STRIPE_PREMIUM_PRICE_ID;
-
-    if (!priceId) {
+    // Get or create the correct price ID based on plan
+    let priceId;
+    try {
+      priceId = await stripeService.getOrCreatePrice(planType);
+      console.log('Using Stripe price ID:', priceId);
+    } catch (priceError) {
+      console.error('Error getting Stripe price:', priceError);
       return res.status(500).json({ 
         success: false, 
-        message: 'Stripe configuration error. Please contact support.' 
+        message: 'Failed to configure pricing. Please contact support.',
+        error: priceError.message
       });
     }
 
-    // Create checkout session
-    const session = await stripeService.createCheckoutSession(
-      stripeCustomerId,
-      priceId,
-      `${process.env.FRONTEND_URL}/dashboard/subscription?success=true&session_id={CHECKOUT_SESSION_ID}`,
-      `${process.env.FRONTEND_URL}/dashboard/subscription?canceled=true`,
-      req.user.id
-    );
+    try {
+      // Create actual Stripe checkout session
+      console.log('Creating Stripe checkout session with:', {
+        customerId: stripeCustomerId,
+        priceId: priceId,
+        planType: planType
+      });
+      
+      const session = await stripeService.createCheckoutSession(
+        stripeCustomerId,
+        priceId,
+        `${process.env.FRONTEND_URL}/dashboard/subscription?success=true&session_id={CHECKOUT_SESSION_ID}`,
+        `${process.env.FRONTEND_URL}/dashboard/subscription?canceled=true`,
+        req.user.id
+      );
 
-    res.json({
-      success: true,
-      checkoutUrl: session.url,
-      sessionId: session.id
-    });
+      console.log('Stripe checkout session created:', session.id);
+
+      res.json({
+        success: true,
+        checkoutUrl: session.url,
+        sessionId: session.id
+      });
+    } catch (stripeError) {
+      console.error('Stripe checkout session error:', stripeError);
+      
+      // Fallback to mock payment if Stripe fails
+      return res.json({
+        success: true,
+        checkoutUrl: `${process.env.FRONTEND_URL}/dashboard/subscription?mock=true&plan=${planType}&error=stripe_failed`,
+        sessionId: `mock_fallback_${Date.now()}`,
+        mock: true,
+        stripeError: stripeError.message
+      });
+    }
   } catch (error) {
     console.error('Create checkout session error:', error);
     res.status(500).json({ 
@@ -224,7 +285,7 @@ router.post('/mock-payment-success', authenticateToken, async (req, res) => {
   try {
     const { planType } = req.body;
     
-    if (!['standard', 'premium'].includes(planType)) {
+    if (!['pro_monthly', 'pro_yearly'].includes(planType)) {
       return res.status(400).json({ 
         success: false, 
         message: 'Invalid plan type' 
@@ -236,13 +297,25 @@ router.post('/mock-payment-success', authenticateToken, async (req, res) => {
       subscription = new Subscription({ userId: req.user.id });
     }
 
+    const planDetails = Subscription.getPlanDetails(planType);
+    
     subscription.planType = planType;
     subscription.status = 'active';
+    subscription.price = planDetails.price;
     subscription.stripeSubscriptionId = `mock_sub_${Date.now()}`;
     
     const nextBilling = new Date();
-    nextBilling.setMonth(nextBilling.getMonth() + 1);
+    if (planType === 'pro_yearly') {
+      nextBilling.setFullYear(nextBilling.getFullYear() + 1);
+    } else {
+      nextBilling.setMonth(nextBilling.getMonth() + 1);
+    }
     subscription.nextBillingDate = nextBilling;
+    subscription.startDate = new Date();
+    subscription.endDate = nextBilling;
+    
+    // Update plan limits
+    subscription.updatePlanLimits();
     
     await subscription.save();
 
@@ -269,11 +342,27 @@ router.post('/verify-checkout', authenticateToken, async (req, res) => {
       });
     }
     
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    const session = await stripe.checkout.sessions.retrieve(sessionId, {
+      expand: ['subscription']
+    });
+    
+    console.log('Retrieved checkout session:', {
+      id: session.id,
+      payment_status: session.payment_status,
+      subscription: session.subscription?.id,
+      userId: session.metadata?.userId
+    });
     
     if (session.payment_status === 'paid' && session.metadata.userId === req.user.id.toString()) {
+      if (!session.subscription) {
+        return res.status(400).json({
+          success: false,
+          message: 'No subscription found in checkout session'
+        });
+      }
+      
       // Update subscription in database
-      await stripeService.updateUserSubscriptionFromStripe(req.user.id, session.subscription);
+      await stripeService.updateUserSubscriptionFromStripe(req.user.id, session.subscription.id || session.subscription);
       
       res.json({
         success: true,
@@ -299,7 +388,7 @@ router.post('/change-plan', authenticateToken, async (req, res) => {
   try {
     const { planType } = req.body;
     
-    if (!['standard', 'premium'].includes(planType)) {
+    if (!['basic', 'pro_monthly', 'pro_yearly'].includes(planType)) {
       return res.status(400).json({ 
         success: false, 
         message: 'Invalid plan type' 
@@ -337,9 +426,24 @@ router.post('/change-plan', authenticateToken, async (req, res) => {
     }
 
     // Update Stripe subscription
-    const priceId = planType === 'standard' 
-      ? process.env.STRIPE_STANDARD_PRICE_ID 
-      : process.env.STRIPE_PREMIUM_PRICE_ID;
+    let priceId;
+    if (planType === 'pro_monthly') {
+      priceId = process.env.STRIPE_PRO_MONTHLY_PRICE_ID;
+    } else if (planType === 'pro_yearly') {
+      priceId = process.env.STRIPE_PRO_YEARLY_PRICE_ID;
+    } else {
+      // Basic plan doesn't need Stripe
+      subscription.planType = 'basic';
+      subscription.status = 'active';
+      subscription.updatePlanLimits();
+      await subscription.save();
+      
+      return res.json({
+        success: true,
+        message: 'Downgraded to Basic plan',
+        subscription: subscription.toObject()
+      });
+    }
 
     await stripeService.updateSubscription(subscription.stripeSubscriptionId, priceId);
     
@@ -403,8 +507,11 @@ router.post('/cancel', authenticateToken, async (req, res) => {
       }
     }
 
-    subscription.planType = 'free_trial';
-    subscription.status = 'cancelled';
+    // Downgrade to basic plan instead of canceling completely
+    subscription.planType = 'basic';
+    subscription.status = 'active';
+    subscription.endDate = null; // Basic plan has no expiration
+    subscription.updatePlanLimits();
     subscription.nextBillingDate = null;
     subscription.paymentMethodId = null;
     subscription.stripeSubscriptionId = null;

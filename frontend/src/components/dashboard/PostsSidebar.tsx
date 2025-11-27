@@ -83,7 +83,7 @@ export default function PostsSidebar() {
         );
       default:
         return (
-          <svg className="w-5 h-5 text-gray-500" fill="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5 text-muted-foreground" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
           </svg>
         );
@@ -92,11 +92,11 @@ export default function PostsSidebar() {
 
   const getStatusBadge = (status: string) => {
     const colors: { [key: string]: string } = {
-      published: 'bg-green-100 text-green-800',
-      scheduled: 'bg-blue-100 text-blue-800', 
-      draft: 'bg-gray-100 text-gray-800'
+      published: 'bg-green-500/10 text-green-600 border border-green-500/20',
+      scheduled: 'bg-blue-500/10 text-blue-600 border border-blue-500/20', 
+      draft: 'bg-muted text-muted-foreground border border-border'
     };
-    return colors[status] || 'bg-gray-100 text-gray-800';
+    return colors[status] || 'bg-muted text-muted-foreground border border-border';
   };
 
   // Generate platform-specific URL with direct post navigation
@@ -222,9 +222,9 @@ export default function PostsSidebar() {
 
   if (loading) {
     return (
-      <Card className="w-80">
+      <Card className="w-80 bg-card border-border">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-card-foreground">
             <RefreshCw className="w-4 h-4 animate-spin" />
             Loading...
           </CardTitle>
@@ -234,16 +234,16 @@ export default function PostsSidebar() {
   }
 
   return (
-    <Card className="w-80">
+    <Card className="w-80 bg-card border-border">
       <CardHeader>
-        <CardTitle>
+        <CardTitle className="text-card-foreground">
           Posts ({posts.length})
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0">
         <ScrollArea className="h-[500px]">
           {posts.length === 0 ? (
-            <div className="p-4 text-center text-gray-500">
+            <div className="p-4 text-center text-muted-foreground">
               <p>No posts yet</p>
               <p className="text-sm">Create your first post!</p>
             </div>
@@ -252,11 +252,11 @@ export default function PostsSidebar() {
               {posts.map((post) => (
                 <div 
                   key={post._id} 
-                  className={`border rounded-lg p-3 transition-all duration-200 ${
+                  className={`border border-border rounded-lg p-3 transition-all duration-200 bg-card ${
                     post.status === 'published'
-                      ? 'cursor-pointer hover:shadow-sm hover:bg-gray-50 hover:scale-[1.02] transform' 
-                      : 'bg-gray-50'
-                  } border-gray-200`}
+                      ? 'cursor-pointer hover:shadow-md hover:bg-accent/50 hover:scale-[1.02] transform hover:border-accent' 
+                      : 'bg-muted/30'
+                  }`}
                   onClick={() => handlePostClick(post)}
                   title={post.status === 'published' ? `Click to view on ${post.platform}` : undefined}
                 >
@@ -264,7 +264,7 @@ export default function PostsSidebar() {
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <span className="text-lg">{getPlatformIcon(post.platform)}</span>
-                      <span className="font-medium text-sm capitalize">
+                      <span className="font-medium text-sm capitalize text-card-foreground">
                         {post.platform}
                       </span>
 
@@ -276,28 +276,28 @@ export default function PostsSidebar() {
 
                   {/* Content Preview */}
                   {post.content?.text ? (
-                    <p className="text-sm text-gray-700 mb-2 line-clamp-2">
+                    <p className="text-sm text-card-foreground/80 mb-2 line-clamp-2">
                       {post.content.text.length > 100 
                         ? `${post.content.text.slice(0, 100)}...`
                         : post.content.text
                       }
                     </p>
                   ) : post.content?.mediaUrls && post.content.mediaUrls.length > 0 ? (
-                    <p className="text-sm text-gray-500 mb-2 italic">
+                    <p className="text-sm text-muted-foreground mb-2 italic">
                       Media-only post
                     </p>
                   ) : null}
 
                   {/* Media Count */}
                   {post.content?.mediaUrls && post.content.mediaUrls.length > 0 && (
-                    <p className="text-xs text-blue-600 mb-2">
+                    <p className="text-xs text-primary mb-2 font-medium">
                       📎 {post.content.mediaUrls.length} media
                     </p>
                   )}
 
                   {/* Analytics for Published Posts */}
                   {post.status === 'published' && post.analytics && (
-                    <div className="flex gap-4 text-xs text-gray-500 mb-2 p-2 bg-gray-50 rounded">
+                    <div className="flex gap-4 text-xs text-muted-foreground mb-2 p-2 bg-muted/50 rounded border border-border">
                       <span className="flex items-center gap-1">
                         <Heart className="w-3 h-3" />
                         {post.analytics.likes || 0}
@@ -315,7 +315,7 @@ export default function PostsSidebar() {
 
                   {/* Time */}
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1 text-xs text-gray-400">
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Clock className="w-3 h-3" />
                       {post.status === 'published' && post.publishedTime 
                         ? formatTime(post.publishedTime)
@@ -325,7 +325,7 @@ export default function PostsSidebar() {
                       }
                     </div>
                     {isPostClickable(post) && (
-                      <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                      <span className="text-xs text-primary bg-primary/10 px-2 py-1 rounded border border-primary/20">
                         Click to view
                       </span>
                     )}

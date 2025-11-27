@@ -23,6 +23,7 @@ import {
   Gift,
   Briefcase
 } from "lucide-react";
+import { SubscriptionGuard } from "@/components/SubscriptionGuard";
 import {
   Card,
   CardContent,
@@ -297,7 +298,8 @@ const GenerateAds = () => {
   };
 
   return (
-    <div className="h-[85vh] bg-gray-50 dark:bg-black text-gray-900 dark:text-gray-100 flex flex-col relative">
+    <SubscriptionGuard feature="ads">
+      <div className="h-[85vh] bg-gray-50 dark:bg-black text-gray-900 dark:text-gray-100 flex flex-col relative">
       {/* Background */}
       <div className="absolute inset-0 bg-gray-50 dark:bg-black">
         <div className="absolute top-0 left-0 w-full h-full overflow-hidden">
@@ -691,8 +693,9 @@ const GenerateAds = () => {
             )}
           </div>
         </div>
+      </div>
     </div>
-    </div>
+    </SubscriptionGuard>
   )
 };
 

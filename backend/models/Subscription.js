@@ -9,14 +9,14 @@ const subscriptionSchema = new mongoose.Schema({
   },
   planType: {
     type: String,
-    enum: ['free_trial', 'free', 'standard', 'premium'],
-    default: 'free_trial',
+    enum: ['basic', 'pro_monthly', 'pro_yearly'],
+    default: 'pro_monthly',
     required: true
   },
   status: {
     type: String,
-    enum: ['trial', 'active', 'inactive', 'cancelled', 'past_due', 'expired'],
-    default: 'trial',
+    enum: ['active', 'inactive', 'cancelled', 'past_due', 'expired', 'trial'],
+    default: 'active',
     required: true
   },
   startDate: {
@@ -26,8 +26,8 @@ const subscriptionSchema = new mongoose.Schema({
   endDate: {
     type: Date,
     default: function() {
-      // Set trial end date to 30 days from now for free trial
-      if (this.planType === 'free_trial') {
+      // Set trial end date to 30 days from now for new users on pro plan
+      if (this.planType === 'pro_monthly') {
         return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
       }
       return null;
@@ -81,8 +81,8 @@ const subscriptionSchema = new mongoose.Schema({
     },
     support: {
       type: String,
-      enum: ['community', 'priority', 'premium'],
-      default: 'community'
+      enum: ['basic', 'priority', 'premium'],
+      default: 'basic'
     },
     teamMembers: {
       type: Number,
@@ -156,7 +156,8 @@ subscriptionSchema.methods.isExpired = function() {
   const now = new Date();
   
   // Check if free trial has expired
-  if (this.planType === 'free_trial' && this.trialEndDate && now > this.trialEndDate) {
+  // Check if subscription has ended (for pro plans)
+  if (['pro_monthly', 'pro_yearly'].includes(this.planType) && this.endDate && now > this.endDate) {
     return true;
   }
   
@@ -170,12 +171,12 @@ subscriptionSchema.methods.isExpired = function() {
 
 // Method to get days remaining in trial
 subscriptionSchema.methods.getDaysRemaining = function() {
-  if (this.planType !== 'free_trial' || !this.trialEndDate) {
+  if (!this.endDate || this.planType === 'basic') {
     return 0;
   }
   
   const now = new Date();
-  const diffTime = this.trialEndDate - now;
+  const diffTime = this.endDate - now;
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   
   return Math.max(0, diffDays);
@@ -189,45 +190,41 @@ subscriptionSchema.methods.hasActiveSubscription = function() {
 // Method to get plan limits based on plan type
 subscriptionSchema.methods.updatePlanLimits = function() {
   switch (this.planType) {
-    case 'free_trial':
-      this.limits = {
-        socialAccounts: 2,
-        scheduledPostsPerWeek: 5,
-        analytics: 'basic',
-        support: 'community',
-        teamMembers: 1
-      };
-      this.price = 0;
-      break;
-    case 'free':
+    case 'basic':
       this.limits = {
         socialAccounts: 1,
-        scheduledPostsPerWeek: 1,
+        scheduledPostsPerWeek: 0,
         analytics: 'basic',
-        support: 'community',
-        teamMembers: 1
+        support: 'basic',
+        teamMembers: 1,
+        canCreatePosts: false,
+        canGenerateAds: false
       };
       this.price = 0;
       break;
-    case 'standard':
+    case 'pro_monthly':
       this.limits = {
-        socialAccounts: 4,
-        scheduledPostsPerWeek: 8,
+        socialAccounts: -1,
+        scheduledPostsPerWeek: -1,
         analytics: 'advanced',
-        support: 'priority',
-        teamMembers: 1
-      };
-      this.price = 10;
-      break;
-    case 'premium':
-      this.limits = {
-        socialAccounts: -1, // Unlimited
-        scheduledPostsPerWeek: -1, // Unlimited
-        analytics: 'custom',
         support: 'premium',
-        teamMembers: -1 // Unlimited
+        teamMembers: 1,
+        canCreatePosts: true,
+        canGenerateAds: true
       };
-      this.price = 25;
+      this.price = 5;
+      break;
+    case 'pro_yearly':
+      this.limits = {
+        socialAccounts: -1,
+        scheduledPostsPerWeek: -1,
+        analytics: 'advanced',
+        support: 'premium',
+        teamMembers: 1,
+        canCreatePosts: true,
+        canGenerateAds: true
+      };
+      this.price = 40;
       break;
   }
 };
@@ -243,78 +240,75 @@ subscriptionSchema.pre('save', function(next) {
 // Static method to get plan details
 subscriptionSchema.statics.getPlanDetails = function(planType) {
   const plans = {
-    free_trial: {
-      name: '30-Day Free Trial',
+    basic: {
+      name: 'Basic Plan',
       price: 0,
-      limits: {
-        socialAccounts: 2,
-        scheduledPostsPerWeek: 5,
-        analytics: 'basic',
-        support: 'community',
-        teamMembers: 1
-      },
-      features: [
-        '2 social media account connections',
-        '5 scheduled posts per week',
-        'Basic analytics',
-        'Community support',
-        '30 days free access'
-      ]
-    },
-    free: {
-      name: 'Free Plan',
-      price: 0,
+      interval: 'forever',
       limits: {
         socialAccounts: 1,
-        scheduledPostsPerWeek: 1,
+        scheduledPostsPerWeek: 0, // Cannot post
         analytics: 'basic',
-        support: 'community',
-        teamMembers: 1
+        support: 'basic',
+        teamMembers: 1,
+        canCreatePosts: false,
+        canGenerateAds: false
       },
       features: [
-        '1 social media account connection',
-        '1 scheduled post per week',
+        'Social media account connections',
         'Basic analytics',
-        'Community support'
+        'Basic support'
+      ],
+      restrictions: [
+        'Cannot create posts',
+        'Cannot generate ads',
+        'Limited features'
       ]
     },
-    standard: {
-      name: 'Standard Plan',
-      price: 10,
+    pro_monthly: {
+      name: 'Pro Plan (Monthly)',
+      price: 5, // 5 USDT
+      interval: 'month',
       limits: {
-        socialAccounts: 4,
-        scheduledPostsPerWeek: 8,
+        socialAccounts: -1, // Unlimited
+        scheduledPostsPerWeek: -1, // Unlimited
         analytics: 'advanced',
-        support: 'priority',
-        teamMembers: 1
-      },
-      features: [
-        '4 social media accounts (1 per platform)',
-        '8 scheduled posts per week',
-        'Advanced analytics',
-        'Priority support'
-      ]
-    },
-    premium: {
-      name: 'Premium Plan',
-      price: 25,
-      limits: {
-        socialAccounts: -1,
-        scheduledPostsPerWeek: -1,
-        analytics: 'custom',
         support: 'premium',
-        teamMembers: -1
+        teamMembers: 1,
+        canCreatePosts: true,
+        canGenerateAds: true
       },
       features: [
         'Unlimited social media accounts',
         'Unlimited scheduled posts',
-        'Custom analytics reports',
-        '24/7 premium support',
-        'Unlimited team members'
+        'AI Ad Generation',
+        'Advanced analytics',
+        'Premium support'
+      ]
+    },
+    pro_yearly: {
+      name: 'Pro Plan (Yearly)',
+      price: 40, // 40 USDT
+      interval: 'year',
+      limits: {
+        socialAccounts: -1, // Unlimited
+        scheduledPostsPerWeek: -1, // Unlimited
+        analytics: 'advanced',
+        support: 'premium',
+        teamMembers: 1,
+        canCreatePosts: true,
+        canGenerateAds: true
+      },
+      features: [
+        'Unlimited social media accounts',
+        'Unlimited scheduled posts',
+        'AI Ad Generation',
+        'Advanced analytics',
+        'Premium support',
+        'Save 33% vs monthly'
       ]
     }
   };
-  return plans[planType] || plans.free;
+  return plans[planType] || plans.basic;
 };
 
 module.exports = mongoose.model('Subscription', subscriptionSchema);
