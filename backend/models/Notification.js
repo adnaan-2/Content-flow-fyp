@@ -7,69 +7,79 @@ const notificationSchema = new mongoose.Schema({
     required: true,
     index: true
   },
-  title: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  message: {
-    type: String,
-    required: true,
-    trim: true
-  },
   type: {
     type: String,
     required: true,
     enum: [
-      'post_scheduled',
-      'post_published', 
+      // Social Account Events
       'social_account_connected',
       'social_account_disconnected',
-      'password_changed',
+      'social_account_connection_failed',
+      
+      // Post Events
+      'post_published',
+      'post_scheduled',
+      'post_publish_failed',
+      'post_schedule_failed',
+      'scheduled_post_edited',
+      
+      // Subscription Events
+      'subscription_activated',
+      'subscription_cancelled',
+      'subscription_expired',
+      'subscription_renewed',
+      
+      // Profile Events
       'profile_updated',
-      'subscription_changed',
-      'payment_processed',
-      'general'
+      'password_changed',
+      'profile_picture_updated'
     ]
+  },
+  title: {
+    type: String,
+    required: true,
+    maxlength: 100
+  },
+  message: {
+    type: String,
+    required: true,
+    maxlength: 500
+  },
+  metadata: {
+    type: mongoose.Schema.Types.Mixed,
+    default: {}
   },
   isRead: {
     type: Boolean,
     default: false,
     index: true
   },
-  data: {
-    type: Object,
-    default: {}
-  },
   createdAt: {
     type: Date,
     default: Date.now,
     index: true
-  },
-  readAt: {
-    type: Date,
-    default: null
   }
 }, {
   timestamps: true
 });
 
-// Index for efficient queries
-notificationSchema.index({ userId: 1, createdAt: -1 });
+// Compound indexes for better query performance
 notificationSchema.index({ userId: 1, isRead: 1, createdAt: -1 });
+notificationSchema.index({ userId: 1, createdAt: -1 });
 
 // Static method to create notification
-notificationSchema.statics.createNotification = async function(userId, title, message, type, data = {}) {
+notificationSchema.statics.createNotification = async function(userId, type, title, message, metadata = {}) {
   try {
     const notification = new this({
       userId,
+      type,
       title,
       message,
-      type,
-      data
+      metadata
     });
     
     await notification.save();
+    console.log(`📱 Notification created for user ${userId}: ${type}`);
     return notification;
   } catch (error) {
     console.error('Error creating notification:', error);
@@ -79,22 +89,33 @@ notificationSchema.statics.createNotification = async function(userId, title, me
 
 // Instance method to mark as read
 notificationSchema.methods.markAsRead = async function() {
-  if (!this.isRead) {
-    this.isRead = true;
-    this.readAt = new Date();
-    await this.save();
-  }
+  this.isRead = true;
+  await this.save();
   return this;
 };
 
-// Instance method to mark as unread
-notificationSchema.methods.markAsUnread = async function() {
-  if (this.isRead) {
-    this.isRead = false;
-    this.readAt = null;
-    await this.save();
+// Static method to get unread count for user
+notificationSchema.statics.getUnreadCount = async function(userId) {
+  try {
+    return await this.countDocuments({ userId, isRead: false });
+  } catch (error) {
+    console.error('Error getting unread count:', error);
+    return 0;
   }
-  return this;
+};
+
+// Static method to mark all as read for user
+notificationSchema.statics.markAllAsRead = async function(userId) {
+  try {
+    const result = await this.updateMany(
+      { userId, isRead: false },
+      { isRead: true }
+    );
+    return result;
+  } catch (error) {
+    console.error('Error marking all as read:', error);
+    throw error;
+  }
 };
 
 module.exports = mongoose.model('Notification', notificationSchema);

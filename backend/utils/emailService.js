@@ -650,5 +650,5 @@ module.exports = {
   sendNewDeviceLoginEmail,
   sendPasswordChangeSuccessEmail,
   // Note: Removed sendSocialAccountConnectedEmail, sendPostScheduledEmail, sendPostPublishedEmail
-  // These are now handled by notificationService.js for in-app notifications
+  // Notification system will be implemented fresh
 };

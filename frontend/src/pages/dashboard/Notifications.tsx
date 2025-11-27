@@ -1,347 +1,303 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Bell, Check, CheckCheck, Eye, EyeOff, Trash2, MoreVertical, RefreshCw } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger 
-} from "@/components/ui/dropdown-menu";
-import { useNotifications } from "@/contexts/NotificationContext";
-import { useToast } from "@/hooks/use-toast";
-import type { Notification } from "@/services/notificationApi";
+import React, { useState, useEffect } from 'react';
+import { Bell, Filter, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useNotifications } from '@/contexts/NotificationContext';
+import { useToast } from '@/hooks/use-toast';
+import notificationApi, { Notification } from '@/services/notificationApi';
+import { formatDistanceToNow } from 'date-fns';
 
-const Notifications = () => {
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const {
-    notifications,
-    unreadCount,
-    loading,
-    refreshNotifications,
-    markAsRead,
-    markAsUnread,
-    markAllAsRead,
-    deleteNotification,
-    deleteAllNotifications,
-    loadMoreNotifications,
-    hasMore
-  } = useNotifications();
+const notificationTypes = [
+  { value: 'all', label: 'All Notifications' },
+  { value: 'social_account_connected', label: 'Account Connected' },
+  { value: 'social_account_disconnected', label: 'Account Disconnected' },
+  { value: 'social_account_connection_failed', label: 'Connection Failed' },
+  { value: 'post_published', label: 'Post Published' },
+  { value: 'post_scheduled', label: 'Post Scheduled' },
+  { value: 'post_publish_failed', label: 'Post Failed' },
+  { value: 'subscription_activated', label: 'Subscription Activated' },
+  { value: 'subscription_cancelled', label: 'Subscription Cancelled' },
+  { value: 'profile_updated', label: 'Profile Updated' },
+];
 
-  const [selectedNotifications, setSelectedNotifications] = useState<string[]>([]);
+const getNotificationIcon = (type: string) => {
+  switch (type) {
+    case 'social_account_connected':
+      return '🔗';
+    case 'social_account_disconnected':
+      return '❌';
+    case 'social_account_connection_failed':
+      return '⚠️';
+    case 'post_published':
+      return '📤';
+    case 'post_scheduled':
+      return '⏰';
+    case 'post_publish_failed':
+    case 'post_schedule_failed':
+      return '❌';
+    case 'scheduled_post_edited':
+      return '✏️';
+    case 'subscription_activated':
+      return '✨';
+    case 'subscription_cancelled':
+    case 'subscription_expired':
+      return '⚠️';
+    case 'subscription_renewed':
+      return '🔄';
+    case 'profile_updated':
+    case 'profile_picture_updated':
+      return '👤';
+    case 'password_changed':
+      return '🔒';
+    default:
+      return '📱';
+  }
+};
+
+const getNotificationColor = (type: string) => {
+  if (type.includes('failed') || type.includes('expired') || type.includes('disconnected')) {
+    return 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/20';
+  }
+  if (type.includes('connected') || type.includes('published') || type.includes('activated') || type.includes('renewed')) {
+    return 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/20';
+  }
+  if (type.includes('scheduled') || type.includes('updated')) {
+    return 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/20';
+  }
+  return 'text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-950/20';
+};
+
+const NotificationsPage: React.FC = () => {
+  const [allNotifications, setAllNotifications] = useState<Notification[]>([]);
+  const [filteredNotifications, setFilteredNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all');
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const { unreadCount, markAllAsRead, deleteAllNotifications } = useNotifications();
+  const { toast } = useToast();
 
-  // Filter notifications based on unread filter
-  const filteredNotifications = showUnreadOnly 
-    ? notifications.filter(n => !n.isRead)
-    : notifications;
-
-  // Format notification time
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+  // Auto-mark all notifications as read when page loads
+  useEffect(() => {
+    const autoMarkAsRead = async () => {
+      if (unreadCount > 0) {
+        try {
+          await markAllAsRead();
+        } catch (error) {
+          console.error('Failed to auto-mark notifications as read:', error);
+        }
+      }
+    };
     
-    if (diffInHours < 1) {
-      const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-      return diffInMinutes <= 1 ? 'Just now' : `${diffInMinutes}m ago`;
-    } else if (diffInHours < 24) {
-      return `${diffInHours}h ago`;
-    } else {
-      const diffInDays = Math.floor(diffInHours / 24);
-      return `${diffInDays}d ago`;
-    }
-  };
+    // Add a small delay to ensure notifications are loaded first
+    const timer = setTimeout(autoMarkAsRead, 1000);
+    return () => clearTimeout(timer);
+  }, [unreadCount, markAllAsRead]);
 
-  // Get notification icon based on type
-  const getNotificationIcon = (type: Notification['type']) => {
-    switch (type) {
-      case 'post_scheduled':
-      case 'post_published':
-        return '📝';
-      case 'social_account_connected':
-      case 'social_account_disconnected':
-        return '🔗';
-      case 'password_changed':
-        return '🔒';
-      case 'profile_updated':
-        return '👤';
-      case 'subscription_changed':
-        return '💳';
-      case 'payment_processed':
-        return '💰';
-      default:
-        return '🔔';
-    }
-  };
-
-  // Handle notification click
-  const handleNotificationClick = async (notification: Notification) => {
-    if (!notification.isRead) {
-      try {
-        await markAsRead(notification._id);
-      } catch (error) {
-        console.error('Error marking notification as read:', error);
-      }
-    }
-  };
-
-  // Handle mark as read/unread
-  const handleToggleRead = async (notification: Notification, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const loadNotifications = async (pageNum = 1, reset = false) => {
     try {
-      if (notification.isRead) {
-        await markAsUnread(notification._id);
-        toast({
-          title: "Marked as unread",
-          description: "Notification marked as unread successfully."
-        });
-      } else {
-        await markAsRead(notification._id);
-        toast({
-          title: "Marked as read",
-          description: "Notification marked as read successfully."
-        });
+      if (pageNum === 1) setLoading(true);
+      
+      const response = await notificationApi.getNotifications(pageNum, 20, showUnreadOnly, filter === 'all' ? undefined : filter);
+      
+      if (response.success) {
+        if (reset || pageNum === 1) {
+          setAllNotifications(response.notifications);
+        } else {
+          setAllNotifications(prev => [...prev, ...response.notifications]);
+        }
+        setHasMore(response.pagination.hasNext);
       }
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to update notification status.",
+        description: "Failed to load notifications",
         variant: "destructive"
       });
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Handle delete notification
-  const handleDelete = async (notificationId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      await deleteNotification(notificationId);
-      toast({
-        title: "Deleted",
-        description: "Notification deleted successfully."
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete notification.",
-        variant: "destructive"
-      });
+  // Filter notifications based on current filters
+  useEffect(() => {
+    let filtered = [...allNotifications];
+    
+    if (filter !== 'all') {
+      filtered = filtered.filter(n => n.type === filter);
     }
-  };
-
-  // Handle mark all as read
-  const handleMarkAllAsRead = async () => {
-    try {
-      await markAllAsRead();
-      toast({
-        title: "Success",
-        description: "All notifications marked as read."
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to mark all notifications as read.",
-        variant: "destructive"
-      });
+    
+    if (showUnreadOnly) {
+      filtered = filtered.filter(n => !n.isRead);
     }
-  };
+    
+    setFilteredNotifications(filtered);
+  }, [allNotifications, filter, showUnreadOnly]);
 
-  // Handle delete all notifications
-  const handleDeleteAll = async () => {
-    try {
-      await deleteAllNotifications();
-      toast({
-        title: "Success",
-        description: "All notifications deleted successfully."
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete all notifications.",
-        variant: "destructive"
-      });
+  useEffect(() => {
+    loadNotifications(1, true);
+  }, [filter, showUnreadOnly]);
+
+
+
+  const loadMore = () => {
+    if (hasMore && !loading) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      loadNotifications(nextPage);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      <div className="container mx-auto py-8 px-4 max-w-4xl">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate('/dashboard')}
-              className="text-gray-400 hover:text-white hover:bg-gray-800"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div className="flex items-center gap-3">
-              <Bell className="h-8 w-8 text-blue-400" />
-              <div>
-                <h1 className="text-3xl font-bold text-white">Notifications</h1>
-                <p className="text-gray-400">
-                  {unreadCount > 0 ? `${unreadCount} unread notifications` : 'All caught up!'}
-                </p>
-              </div>
-            </div>
+    <div className="container mx-auto py-6 px-4">
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <Bell className="h-6 w-6" />
+            <h1 className="text-2xl font-bold">Notifications</h1>
+            {unreadCount > 0 && (
+              <Badge variant="destructive">
+                {unreadCount} unread
+              </Badge>
+            )}
           </div>
-
+          
           <div className="flex items-center gap-2">
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
-              onClick={() => refreshNotifications()}
+              onClick={() => loadNotifications(1, true)}
               disabled={loading}
-              className="border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white"
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  className="border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white"
-                >
-                  <MoreVertical className="h-4 w-4 mr-2" />
-                  Actions
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-gray-800 border-gray-700">
-                <DropdownMenuItem 
-                  onClick={handleMarkAllAsRead}
-                  disabled={unreadCount === 0}
-                  className="text-gray-300 hover:bg-gray-700 hover:text-white"
-                >
-                  <CheckCheck className="h-4 w-4 mr-2" />
-                  Mark All as Read
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => setShowUnreadOnly(!showUnreadOnly)}
-                  className="text-gray-300 hover:bg-gray-700 hover:text-white"
-                >
-                  <Eye className="h-4 w-4 mr-2" />
-                  {showUnreadOnly ? 'Show All' : 'Show Unread Only'}
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={handleDeleteAll}
-                  disabled={notifications.length === 0}
-                  className="text-red-400 hover:bg-gray-700 hover:text-red-300"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete All
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
         </div>
 
-        {/* Notifications List */}
-        <div className="space-y-4">
-          {filteredNotifications.length === 0 ? (
-            <Card className="bg-gray-800 border-gray-700">
-              <CardContent className="py-12 text-center">
-                <Bell className="h-16 w-16 mx-auto text-gray-500 mb-4" />
-                <h3 className="text-xl font-semibold text-gray-300 mb-2">
-                  {showUnreadOnly ? 'No unread notifications' : 'No notifications yet'}
-                </h3>
-                <p className="text-gray-500">
-                  {showUnreadOnly 
-                    ? 'All your notifications have been read.' 
-                    : 'When you have notifications, they will appear here.'}
-                </p>
-              </CardContent>
-            </Card>
+        {/* Filters */}
+        <div className="flex items-center gap-4 mb-4">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4" />
+            <span className="text-sm font-medium">Filters:</span>
+          </div>
+          
+          <Select value={filter} onValueChange={setFilter}>
+            <SelectTrigger className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {notificationTypes.map((type) => (
+                <SelectItem key={type.value} value={type.value}>
+                  {type.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          <Button
+            variant={showUnreadOnly ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowUnreadOnly(!showUnreadOnly)}
+          >
+            Unread only
+          </Button>
+        </div>
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          {loading && filteredNotifications.length === 0 ? (
+            <div className="flex items-center justify-center p-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <span className="ml-3 text-muted-foreground">Loading notifications...</span>
+            </div>
+          ) : filteredNotifications.length === 0 ? (
+            <div className="text-center p-12">
+              <Bell className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
+              <h3 className="text-lg font-medium mb-2">No notifications found</h3>
+              <p className="text-muted-foreground">
+                {showUnreadOnly 
+                  ? "You have no unread notifications" 
+                  : filter !== 'all'
+                  ? `No notifications of type "${notificationTypes.find(t => t.value === filter)?.label}"`
+                  : "You're all caught up!"
+                }
+              </p>
+            </div>
           ) : (
-            <>
-              {filteredNotifications.map((notification) => (
-                <Card
-                  key={notification._id}
-                  className={`bg-gray-800 border-gray-700 cursor-pointer transition-all duration-200 hover:bg-gray-750 hover:border-gray-600 ${
-                    !notification.isRead ? 'ring-2 ring-blue-500/20 bg-gray-800/80' : ''
-                  }`}
-                  onClick={() => handleNotificationClick(notification)}
-                >
-                  <CardContent className="p-4">
+            <ScrollArea className="h-[600px]">
+              <div className="space-y-0">
+                {filteredNotifications.map((notification, index) => (
+                  <div
+                    key={notification._id}
+                    className={`group relative p-4 border-b border-border last:border-b-0 hover:bg-accent/30 transition-colors border-l-4 ${
+                      notification.isRead 
+                        ? 'border-l-transparent' 
+                        : 'border-l-primary'
+                    }`}
+                  >
                     <div className="flex items-start gap-4">
-                      <div className="text-2xl flex-shrink-0 mt-1">
-                        {getNotificationIcon(notification.type)}
+                      <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${getNotificationColor(notification.type)}`}>
+                        <span className="text-xl" role="img" aria-label="notification-icon">
+                          {getNotificationIcon(notification.type)}
+                        </span>
                       </div>
                       
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start justify-between">
                           <div className="flex-1 min-w-0">
-                            <h3 className={`font-semibold text-lg ${
-                              notification.isRead ? 'text-gray-300' : 'text-white'
-                            }`}>
+                            <h3 className="font-medium text-card-foreground mb-1">
                               {notification.title}
                             </h3>
-                            <p className={`mt-1 text-sm ${
-                              notification.isRead ? 'text-gray-500' : 'text-gray-400'
-                            }`}>
+                            <p className="text-sm text-muted-foreground mb-2 break-words">
                               {notification.message}
                             </p>
+                            
+                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                              <span>
+                                {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
+                              </span>
+                              
+                              <Badge variant="outline" className="text-xs">
+                                {notificationTypes.find(t => t.value === notification.type)?.label || notification.type}
+                              </Badge>
+                            </div>
                           </div>
                           
-                          <div className="flex items-center gap-2 flex-shrink-0">
+                          <div className="flex items-center gap-1 ml-4">
                             {!notification.isRead && (
-                              <Badge className="bg-blue-600 hover:bg-blue-700 text-white">
-                                New
-                              </Badge>
+                              <div className="w-2 h-2 bg-primary rounded-full mr-2"></div>
                             )}
-                            <span className="text-xs text-gray-500">
-                              {formatTime(notification.createdAt)}
-                            </span>
                           </div>
                         </div>
                       </div>
-
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => handleToggleRead(notification, e)}
-                          className="text-gray-400 hover:text-white hover:bg-gray-700 h-8 w-8 p-0"
-                          title={notification.isRead ? "Mark as unread" : "Mark as read"}
-                        >
-                          {notification.isRead ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
-                        
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => handleDelete(notification._id, e)}
-                          className="text-gray-400 hover:text-red-400 hover:bg-gray-700 h-8 w-8 p-0"
-                          title="Delete notification"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-
+                  </div>
+                ))}
+              </div>
+              
               {/* Load More Button */}
               {hasMore && (
-                <div className="text-center py-6">
+                <div className="p-4 text-center">
                   <Button
                     variant="outline"
-                    onClick={loadMoreNotifications}
+                    onClick={loadMore}
                     disabled={loading}
-                    className="border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white"
                   >
                     {loading ? (
                       <>
-                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
                         Loading...
                       </>
                     ) : (
@@ -350,12 +306,12 @@ const Notifications = () => {
                   </Button>
                 </div>
               )}
-            </>
+            </ScrollArea>
           )}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
 
-export default Notifications;
+export default NotificationsPage;

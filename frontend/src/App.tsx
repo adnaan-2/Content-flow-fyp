@@ -1,9 +1,9 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { NotificationProvider } from "@/contexts/NotificationContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
+import { NotificationProvider } from "@/contexts/NotificationContext";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
@@ -37,7 +37,7 @@ function App() {
       <AuthProvider>
         <SubscriptionProvider>
           <NotificationProvider>
-          <TooltipProvider>
+            <TooltipProvider>
           <Router>
             <Routes>
               {/* Public Routes */}
@@ -77,8 +77,8 @@ function App() {
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Router>
-          <Toaster />
-        </TooltipProvider>
+            <Toaster />
+            </TooltipProvider>
           </NotificationProvider>
         </SubscriptionProvider>
       </AuthProvider>

@@ -1,6 +1,7 @@
 const ScheduledPost = require('../models/ScheduledPost');
 const Post = require('../models/Post');
 const SocialAccount = require('../models/SocialAccount');
+const NotificationService = require('../services/notificationService');
 const schedule = require('node-schedule');
 const { postToSocialMedia, getSocialAccount } = require('./postController');
 
@@ -115,6 +116,13 @@ const schedulePost = async (req, res) => {
     });
 
     scheduledJobs.set(scheduledPost._id.toString(), job);
+
+    // Send notification for successful scheduling
+    try {
+      await NotificationService.postScheduled(userId, platforms, scheduleDate, caption);
+    } catch (notificationError) {
+      console.error('Schedule notification error:', notificationError);
+    }
 
     res.json({
       message: 'Post scheduled successfully',

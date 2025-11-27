@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 
 import { mediaService, adService, postService } from '@/services/api';
 import { SubscriptionGuard } from "@/components/SubscriptionGuard";
+import { useNotifications } from '@/contexts/NotificationContext';
 
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from "@/components/ui/card";
@@ -255,6 +256,7 @@ const ModernTimePicker = ({ value, onChange }: { value: string; onChange: (time:
 };
 
 const UploadMedia = () => {
+  const { triggerRefresh } = useNotifications();
   const [mediaFiles, setMediaFiles] = useState<any[]>([]);
   const [importedMedia, setImportedMedia] = useState<any[]>([]);
   const [generatedMedia, setGeneratedMedia] = useState<any[]>([]);
@@ -267,6 +269,11 @@ const UploadMedia = () => {
   const [scheduledTime, setScheduledTime] = useState("10:00");
   const [isGeneratingCaption, setIsGeneratingCaption] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
+  const [isScheduling, setIsScheduling] = useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [showErrorMessage, setShowErrorMessage] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
   const [connectedAccounts, setConnectedAccounts] = useState<any[]>([]);
 
   // Fetch imported media from Cloudinary on mount
@@ -404,6 +411,9 @@ const UploadMedia = () => {
       return;
     }
 
+    // Clear any existing messages
+    setShowSuccessMessage(false);
+    setShowErrorMessage(false);
     setIsPosting(true);
     
     // Show special message for Instagram
@@ -440,9 +450,15 @@ const UploadMedia = () => {
 
       const response = await postService.postNow(postData);
       
+      // Clear error message and show success message on screen
+      setShowErrorMessage(false);
+      const platforms = response.data.results.map(r => r.platform).join(", ");
+      setSuccessMessage(`✅ Posted successfully to ${platforms}!`);
+      setShowSuccessMessage(true);
+      
       toast({ 
         title: "Posted successfully!", 
-        description: `Posted to ${response.data.results.map(r => r.platform).join(", ")}` 
+        description: `Posted to ${platforms}` 
       });
 
       // Trigger real-time post update for PostsSidebar
@@ -458,26 +474,43 @@ const UploadMedia = () => {
       
       console.log('🚀 Post creation event triggered for real-time update');
 
+      // Trigger notification refresh to show post notification
+      setTimeout(triggerRefresh, 500);
+
       // Reset form
       setSelectedImages([]);
       setCaption('');
       setSelectedPlatforms([]);
+      
+      // Auto-hide success message after 5 seconds
+      setTimeout(() => setShowSuccessMessage(false), 5000);
 
       // Show any errors if some platforms failed
       if (response.data.errors && response.data.errors.length > 0) {
+        const errorText = response.data.errors.join(", ");
+        setErrorMessage(`⚠️ Some posts failed: ${errorText}`);
+        setShowErrorMessage(true);
+        setTimeout(() => setShowErrorMessage(false), 7000);
+        
         toast({
           title: "Some posts failed",
-          description: response.data.errors.join(", "),
+          description: errorText,
           variant: "destructive"
         });
       }
 
     } catch (error) {
       console.error('Post now error:', error);
-      const errorMessage = error.response?.data?.error || "Could not post to social media. Please try again.";
+      const errorText = error.response?.data?.error || "Could not post to social media. Please try again.";
+      
+      // Clear success message and show error message on screen
+      setShowSuccessMessage(false);
+      setErrorMessage(`❌ Posting failed: ${errorText}`);
+      setShowErrorMessage(true);
+      setTimeout(() => setShowErrorMessage(false), 7000);
       
       // Special handling for Instagram timeout errors
-      if (errorMessage.includes('took too long to process') || errorMessage.includes('Instagram')) {
+      if (errorText.includes('took too long to process') || errorText.includes('Instagram')) {
         toast({ 
           title: "Instagram Processing Delay", 
           description: "Instagram is taking longer than usual to process your media. Please try again in a few minutes.",
@@ -486,7 +519,7 @@ const UploadMedia = () => {
       } else {
         toast({ 
           title: "Posting failed", 
-          description: errorMessage,
+          description: errorText,
           variant: "destructive" 
         });
       }
@@ -519,6 +552,11 @@ const UploadMedia = () => {
       return;
     }
 
+    // Clear any existing messages
+    setShowSuccessMessage(false);
+    setShowErrorMessage(false);
+    setIsScheduling(true);
+    
     try {
       // Combine date and time
       const scheduleDateTime = new Date(scheduledDate);
@@ -546,17 +584,30 @@ const UploadMedia = () => {
 
       const response = await postService.schedulePost(postData);
       
+      console.log('📅 Schedule response:', response);
+      
       setShowScheduleDialog(false);
+      
+      // Clear error message and show success message on screen
+      setShowErrorMessage(false);
+      const scheduleInfo = `${scheduledDate.toLocaleDateString()} at ${scheduledTime}`;
+      
+      // Handle different response structures (Axios responses expose payload on .data)
+      const platforms = response.data?.platforms || mappedPlatforms;
+      const platformsText = Array.isArray(platforms) ? platforms.join(", ") : platforms;
+      
+      setSuccessMessage(`✅ Post scheduled successfully for ${scheduleInfo} on ${platformsText}!`);
+      setShowSuccessMessage(true);
       
       toast({ 
         title: "Post scheduled successfully!", 
-        description: `Scheduled for ${scheduledDate.toLocaleDateString()} at ${scheduledTime} on ${response.data.platforms.join(", ")}` 
+        description: `Scheduled for ${scheduleInfo} on ${platformsText}` 
       });
 
       // Trigger real-time post update for PostsSidebar (scheduled posts also appear in recent posts)
       window.dispatchEvent(new CustomEvent('post-created', { 
         detail: { 
-          platforms: response.data.platforms,
+          platforms: Array.isArray(platforms) ? platforms : [platforms],
           status: 'scheduled',
           scheduledTime: scheduleDateTime.toISOString()
         } 
@@ -567,18 +618,36 @@ const UploadMedia = () => {
       
       console.log('📅 Scheduled post creation event triggered for real-time update');
 
+      // Trigger notification refresh to show scheduling notification
+      setTimeout(triggerRefresh, 500);
+
       // Reset form
       setSelectedImages([]);
       setCaption('');
       setSelectedPlatforms([]);
+      
+      // Auto-hide success message after 5 seconds
+      setTimeout(() => setShowSuccessMessage(false), 5000);
 
     } catch (error) {
       console.error('Schedule post error:', error);
+      console.error('Error details:', error.response?.data);
+      
+      const errorText = error.response?.data?.error || error.response?.data?.message || error.message || "Could not schedule post. Please try again.";
+      
+      // Clear success message and show error message on screen
+      setShowSuccessMessage(false);
+      setErrorMessage(`❌ Scheduling failed: ${errorText}`);
+      setShowErrorMessage(true);
+      setTimeout(() => setShowErrorMessage(false), 7000);
+      
       toast({ 
         title: "Scheduling failed", 
-        description: error.response?.data?.error || "Could not schedule post. Please try again.",
+        description: errorText,
         variant: "destructive" 
       });
+    } finally {
+      setIsScheduling(false);
     }
   };
 
@@ -642,6 +711,86 @@ const UploadMedia = () => {
       <div className="space-y-8">
       <h1 className="text-3xl font-bold tracking-tight">Upload & Generate Media</h1>
       <p className="text-muted-foreground mb-4">Import media, generate content, and post to social platforms.</p>
+
+      {/* Success Notification */}
+      {showSuccessMessage && (
+        <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right-5">
+          <div className="bg-green-600 text-white px-6 py-4 rounded-lg shadow-2xl flex items-center gap-3 max-w-md">
+            <div className="flex-shrink-0">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-sm">{successMessage}</p>
+            </div>
+            <button 
+              onClick={() => setShowSuccessMessage(false)}
+              className="flex-shrink-0 hover:bg-green-700 rounded-full p-1 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Error Notification */}
+      {showErrorMessage && (
+        <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right-5">
+          <div className="bg-red-600 text-white px-6 py-4 rounded-lg shadow-2xl flex items-center gap-3 max-w-md">
+            <div className="flex-shrink-0">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-sm">{errorMessage}</p>
+            </div>
+            <button 
+              onClick={() => setShowErrorMessage(false)}
+              className="flex-shrink-0 hover:bg-red-700 rounded-full p-1 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Processing Overlay */}
+      {(isPosting || isScheduling) && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-8 max-w-md w-full mx-4 animate-in zoom-in-95">
+            <div className="flex flex-col items-center gap-4">
+              <div className="relative">
+                <Loader2 className="h-16 w-16 text-purple-600 animate-spin" />
+                <div className="absolute inset-0 h-16 w-16 bg-purple-600/20 rounded-full animate-ping"></div>
+              </div>
+              <div className="text-center">
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                  {isPosting ? 'Posting to Social Media...' : 'Scheduling Post...'}
+                </h3>
+                <p className="text-gray-600 dark:text-gray-400 text-sm">
+                  {isPosting 
+                    ? selectedPlatforms.includes('instagram')
+                      ? 'Instagram posts may take 30-60 seconds to process. Please wait...'
+                      : 'Publishing your content across selected platforms...'
+                    : 'Setting up your scheduled post...'
+                  }
+                </p>
+              </div>
+              {isPosting && (
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-purple-600 to-blue-600 animate-pulse rounded-full" style={{ width: '70%' }}></div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Images Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
@@ -777,7 +926,7 @@ const UploadMedia = () => {
                 <Button
                   variant="outline"
                   className="flex-1"
-                  disabled={selectedImages.length === 0 || selectedPlatforms.length === 0 || isPosting}
+                  disabled={selectedImages.length === 0 || selectedPlatforms.length === 0 || isPosting || isScheduling}
                   onClick={() => setShowScheduleDialog(true)}
                 >
                   Post Later
@@ -995,10 +1144,10 @@ const UploadMedia = () => {
               </Button>
               <Button 
                 onClick={handleSchedulePost} 
-                disabled={isPosting}
+                disabled={isScheduling}
                 className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold h-9 text-sm"
               >
-                {isPosting ? (
+                {isScheduling ? (
                   <>
                     <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                     Scheduling...

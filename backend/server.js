@@ -167,7 +167,7 @@ app.use('/api/subscription', subscriptionRoutes);
 const postRoutes = require('./routes/postRoutes');
 app.use('/api/posts', postRoutes);
 
-// Add notification routes
+// Notification routes
 const notificationRoutes = require('./routes/notificationRoutes');
 app.use('/api/notifications', notificationRoutes);
 // Schedule routes

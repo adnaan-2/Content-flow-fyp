@@ -1,191 +1,366 @@
-const { createNotification } = require('../controllers/notificationController');
+const Notification = require('../models/Notification');
 
-// Notification service to replace email notifications for internal app events
-const notificationService = {
-  
-  // Send notification when a post is scheduled
-  sendPostScheduledNotification: async (userId, postDetails) => {
+class NotificationService {
+  // Post-related notifications
+  static async postPublished(userId, platforms, message = null, postContent = null) {
     try {
-      const title = "Post Scheduled Successfully";
-      const message = `Your post "${postDetails.content?.substring(0, 50) || 'New post'}..." has been scheduled to publish on ${new Date(postDetails.scheduledTime).toLocaleDateString()}.`;
-      const type = "post_scheduled";
-      const data = {
-        postId: postDetails.id,
-        scheduledTime: postDetails.scheduledTime,
-        platforms: postDetails.platforms || []
-      };
-
-      await createNotification(userId, title, message, type, data);
-      console.log('Post scheduled notification sent to user:', userId);
-      return { success: true };
-    } catch (error) {
-      console.error('Error sending post scheduled notification:', error);
-      return { success: false, error: error.message };
-    }
-  },
-
-  // Send notification when a post is published
-  sendPostPublishedNotification: async (userId, postDetails) => {
-    try {
-      const title = "Post Published Successfully";
-      const message = `Your post "${postDetails.content?.substring(0, 50) || 'New post'}..." has been published across your connected social media platforms.`;
-      const type = "post_published";
-      const data = {
-        postId: postDetails.id,
-        publishedTime: new Date(),
-        platforms: postDetails.platforms || [],
-        engagement: postDetails.engagement || {}
-      };
-
-      await createNotification(userId, title, message, type, data);
-      console.log('Post published notification sent to user:', userId);
-      return { success: true };
-    } catch (error) {
-      console.error('Error sending post published notification:', error);
-      return { success: false, error: error.message };
-    }
-  },
-
-  // Send notification when a social account is connected
-  sendSocialAccountConnectedNotification: async (userId, platform, accountName) => {
-    try {
-      const title = "Social Account Connected";
-      const message = `Your ${platform} account (@${accountName}) has been successfully connected to ContentFlow.`;
-      const type = "social_account_connected";
-      const data = {
-        platform,
-        accountName,
-        connectedAt: new Date()
-      };
-
-      await createNotification(userId, title, message, type, data);
-      console.log('Social account connected notification sent to user:', userId);
-      return { success: true };
-    } catch (error) {
-      console.error('Error sending social account connected notification:', error);
-      return { success: false, error: error.message };
-    }
-  },
-
-  // Send notification when a social account is disconnected
-  sendSocialAccountDisconnectedNotification: async (userId, platform, accountName) => {
-    try {
-      const title = "Social Account Disconnected";
-      const message = `Your ${platform} account (@${accountName}) has been disconnected from ContentFlow.`;
-      const type = "social_account_disconnected";
-      const data = {
-        platform,
-        accountName,
-        disconnectedAt: new Date()
-      };
-
-      await createNotification(userId, title, message, type, data);
-      console.log('Social account disconnected notification sent to user:', userId);
-      return { success: true };
-    } catch (error) {
-      console.error('Error sending social account disconnected notification:', error);
-      return { success: false, error: error.message };
-    }
-  },
-
-  // Send notification when password is changed
-  sendPasswordChangedNotification: async (userId) => {
-    try {
-      const title = "Password Changed";
-      const message = "Your account password has been successfully updated. If you didn't make this change, please contact support immediately.";
-      const type = "password_changed";
-      const data = {
-        changedAt: new Date(),
-        securityAlert: true
-      };
-
-      await createNotification(userId, title, message, type, data);
-      console.log('Password changed notification sent to user:', userId);
-      return { success: true };
-    } catch (error) {
-      console.error('Error sending password changed notification:', error);
-      return { success: false, error: error.message };
-    }
-  },
-
-  // Send notification when profile is updated
-  sendProfileUpdatedNotification: async (userId, updatedFields) => {
-    try {
-      const title = "Profile Updated";
-      const fieldsList = Array.isArray(updatedFields) ? updatedFields.join(', ') : 'profile information';
-      const message = `Your ${fieldsList} has been successfully updated.`;
-      const type = "profile_updated";
-      const data = {
-        updatedFields,
-        updatedAt: new Date()
-      };
-
-      await createNotification(userId, title, message, type, data);
-      console.log('Profile updated notification sent to user:', userId);
-      return { success: true };
-    } catch (error) {
-      console.error('Error sending profile updated notification:', error);
-      return { success: false, error: error.message };
-    }
-  },
-
-  // Send notification when subscription changes
-  sendSubscriptionChangedNotification: async (userId, newPlan, oldPlan) => {
-    try {
-      const title = "Subscription Updated";
-      const message = `Your subscription has been ${oldPlan === 'free' ? 'upgraded' : 'changed'} from ${oldPlan} to ${newPlan} plan.`;
-      const type = "subscription_changed";
-      const data = {
-        newPlan,
-        oldPlan,
-        changedAt: new Date()
-      };
-
-      await createNotification(userId, title, message, type, data);
-      console.log('Subscription changed notification sent to user:', userId);
-      return { success: true };
-    } catch (error) {
-      console.error('Error sending subscription changed notification:', error);
-      return { success: false, error: error.message };
-    }
-  },
-
-  // Send notification when payment is processed
-  sendPaymentProcessedNotification: async (userId, amount, status) => {
-    try {
-      const title = status === 'success' ? "Payment Processed" : "Payment Failed";
-      const message = status === 'success' 
-        ? `Your payment of $${amount} has been successfully processed.`
-        : `Your payment of $${amount} could not be processed. Please update your payment method.`;
-      const type = "payment_processed";
-      const data = {
-        amount,
-        status,
-        processedAt: new Date()
-      };
-
-      await createNotification(userId, title, message, type, data);
-      console.log('Payment processed notification sent to user:', userId);
-      return { success: true };
-    } catch (error) {
-      console.error('Error sending payment processed notification:', error);
-      return { success: false, error: error.message };
-    }
-  },
-
-  // Send general notification
-  sendGeneralNotification: async (userId, title, message, data = {}) => {
-    try {
-      const type = "general";
+      console.log('📢 Creating post published notification for user:', userId);
+      console.log('📢 Platforms:', platforms);
+      console.log('📢 Message:', message);
+      console.log('📢 Post content:', postContent);
       
-      await createNotification(userId, title, message, type, data);
-      console.log('General notification sent to user:', userId);
-      return { success: true };
+      const notification = await Notification.createNotification({
+        userId,
+        type: 'post_published',
+        title: 'Post Published Successfully',
+        message: message || `Your post was successfully published to ${platforms.join(', ')}`,
+        data: {
+          platforms,
+          postContent: postContent || 'No content provided'
+        }
+      });
+      
+      console.log('📢 Post published notification created:', notification._id);
+      return notification;
     } catch (error) {
-      console.error('Error sending general notification:', error);
-      return { success: false, error: error.message };
+      console.error('📢 Error creating post published notification:', error);
+      throw error;
     }
   }
-};
 
-module.exports = notificationService;
+  static async postPublishFailed(userId, platforms, error, postContent = null) {
+    try {
+      console.log('📢 Creating post publish failed notification for user:', userId);
+      console.log('📢 Platforms:', platforms);
+      console.log('📢 Error:', error);
+      console.log('📢 Post content:', postContent);
+      
+      const notification = await Notification.createNotification({
+        userId,
+        type: 'post_failed',
+        title: 'Post Publishing Failed',
+        message: `Failed to publish post to ${platforms.join(', ')}: ${error}`,
+        data: {
+          platforms,
+          error,
+          postContent: postContent || 'No content provided'
+        }
+      });
+      
+      console.log('📢 Post publish failed notification created:', notification._id);
+      return notification;
+    } catch (notificationError) {
+      console.error('📢 Error creating post failed notification:', notificationError);
+      throw notificationError;
+    }
+  }
+
+  static async postScheduled(userId, platforms, scheduledDate, postContent = null) {
+    try {
+      const notification = await Notification.createNotification({
+        userId,
+        type: 'post_scheduled',
+        title: 'Post Scheduled Successfully',
+        message: `Your post has been scheduled for ${new Date(scheduledDate).toLocaleString()} on ${platforms.join(', ')}`,
+        data: {
+          platforms,
+          scheduledDate,
+          postContent
+        }
+      });
+      
+      console.log('📢 Post scheduled notification created for user:', userId);
+      return notification;
+    } catch (error) {
+      console.error('📢 Error creating post scheduled notification:', error);
+      throw error;
+    }
+  }
+
+  static async postScheduleFailed(userId, platforms, error, postContent = null) {
+    try {
+      const notification = await Notification.createNotification({
+        userId,
+        type: 'schedule_failed',
+        title: 'Post Scheduling Failed',
+        message: `Failed to schedule post for ${platforms.join(', ')}: ${error}`,
+        data: {
+          platforms,
+          error,
+          postContent
+        }
+      });
+      
+      console.log('📢 Post schedule failed notification created for user:', userId);
+      return notification;
+    } catch (notificationError) {
+      console.error('📢 Error creating schedule failed notification:', notificationError);
+      throw notificationError;
+    }
+  }
+
+  static async postUpdated(userId, postId, changes = null) {
+    try {
+      const notification = await Notification.createNotification({
+        userId,
+        type: 'post_updated',
+        title: 'Post Updated',
+        message: 'Your post has been updated successfully',
+        data: {
+          postId,
+          changes
+        }
+      });
+      
+      console.log('📢 Post updated notification created for user:', userId);
+      return notification;
+    } catch (error) {
+      console.error('📢 Error creating post updated notification:', error);
+      throw error;
+    }
+  }
+
+  // Social account notifications
+  static async socialAccountConnected(userId, platform, accountName = null) {
+    try {
+      console.log('📢 Creating social account connected notification for user:', userId);
+      console.log('📢 Platform:', platform);
+      console.log('📢 Account name:', accountName);
+      
+      const notification = await Notification.createNotification({
+        userId,
+        type: 'account_connected',
+        title: 'Account Connected',
+        message: `Your ${platform} account${accountName ? ` (${accountName})` : ''} has been connected successfully`,
+        data: {
+          platform,
+          accountName
+        }
+      });
+      
+      console.log('📢 Social account connected notification created:', notification._id);
+      return notification;
+    } catch (error) {
+      console.error('📢 Error creating social account connected notification:', error);
+      throw error;
+    }
+  }
+
+  static async socialAccountDisconnected(userId, platform, accountName = null) {
+    try {
+      const notification = await Notification.createNotification({
+        userId,
+        type: 'account_disconnected',
+        title: 'Account Disconnected',
+        message: `Your ${platform} account${accountName ? ` (${accountName})` : ''} has been disconnected`,
+        data: {
+          platform,
+          accountName
+        }
+      });
+      
+      console.log('📢 Social account disconnected notification created for user:', userId);
+      return notification;
+    } catch (error) {
+      console.error('📢 Error creating social account disconnected notification:', error);
+      throw error;
+    }
+  }
+
+  static async socialAccountConnectionFailed(userId, platform, error) {
+    try {
+      const notification = await Notification.createNotification({
+        userId,
+        type: 'connection_failed',
+        title: 'Connection Failed',
+        message: `Failed to connect your ${platform} account: ${error}`,
+        data: {
+          platform,
+          error
+        }
+      });
+      
+      console.log('📢 Social account connection failed notification created for user:', userId);
+      return notification;
+    } catch (notificationError) {
+      console.error('📢 Error creating connection failed notification:', notificationError);
+      throw notificationError;
+    }
+  }
+
+  // Subscription notifications
+  static async subscriptionActivated(userId, plan, features = []) {
+    try {
+      console.log('📢 Creating subscription activated notification for user:', userId);
+      console.log('📢 Plan:', plan);
+      console.log('📢 Features:', features);
+      
+      const notification = await Notification.createNotification({
+        userId,
+        type: 'subscription_activated',
+        title: 'Subscription Activated',
+        message: `Your ${plan} subscription has been activated successfully`,
+        data: {
+          plan,
+          features
+        }
+      });
+      
+      console.log('📢 Subscription activated notification created:', notification._id);
+      return notification;
+    } catch (error) {
+      console.error('📢 Error creating subscription activated notification:', error);
+      throw error;
+    }
+  }
+
+  static async subscriptionCancelled(userId, plan, effectiveDate = null) {
+    try {
+      console.log('📢 Creating subscription cancelled notification for user:', userId);
+      console.log('📢 Plan:', plan);
+      console.log('📢 Effective date:', effectiveDate);
+      
+      const notification = await Notification.createNotification({
+        userId,
+        type: 'subscription_cancelled',
+        title: 'Subscription Cancelled',
+        message: `Your ${plan} subscription has been cancelled${effectiveDate ? ` (effective ${new Date(effectiveDate).toLocaleDateString()})` : ''}`,
+        data: {
+          plan,
+          effectiveDate
+        }
+      });
+      
+      console.log('📢 Subscription cancelled notification created:', notification._id);
+      return notification;
+    } catch (error) {
+      console.error('📢 Error creating subscription cancelled notification:', error);
+      throw error;
+    }
+  }
+
+  static async subscriptionExpired(userId, plan) {
+    try {
+      const notification = await Notification.createNotification({
+        userId,
+        type: 'subscription_expired',
+        title: 'Subscription Expired',
+        message: `Your ${plan} subscription has expired. Please renew to continue using premium features`,
+        data: {
+          plan
+        }
+      });
+      
+      console.log('📢 Subscription expired notification created for user:', userId);
+      return notification;
+    } catch (error) {
+      console.error('📢 Error creating subscription expired notification:', error);
+      throw error;
+    }
+  }
+
+  // Profile notifications
+  static async profileUpdated(userId, message) {
+    try {
+      const notification = await Notification.createNotification({
+        userId,
+        type: 'profile_updated',
+        title: 'Profile Updated',
+        message: message || 'Your profile has been updated successfully',
+        data: {}
+      });
+      
+      console.log('📢 Profile updated notification created for user:', userId);
+      return notification;
+    } catch (error) {
+      console.error('📢 Error creating profile updated notification:', error);
+      throw error;
+    }
+  }
+
+  // General utility methods
+  static async getNotifications(userId, page = 1, limit = 10) {
+    try {
+      const notifications = await Notification.find({ userId })
+        .sort({ createdAt: -1 })
+        .limit(limit * 1)
+        .skip((page - 1) * limit)
+        .lean();
+      
+      return notifications;
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      throw error;
+    }
+  }
+
+  static async getUnreadCount(userId) {
+    try {
+      const count = await Notification.countDocuments({ 
+        userId, 
+        isRead: false 
+      });
+      
+      return count;
+    } catch (error) {
+      console.error('Error getting unread count:', error);
+      throw error;
+    }
+  }
+
+  static async markAsRead(userId, notificationId) {
+    try {
+      const notification = await Notification.findOneAndUpdate(
+        { _id: notificationId, userId },
+        { isRead: true, readAt: new Date() },
+        { new: true }
+      );
+      
+      return notification;
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      throw error;
+    }
+  }
+
+  static async markAllAsRead(userId) {
+    try {
+      const result = await Notification.updateMany(
+        { userId, isRead: false },
+        { isRead: true, readAt: new Date() }
+      );
+      
+      return result;
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+      throw error;
+    }
+  }
+
+  static async deleteNotification(userId, notificationId) {
+    try {
+      const result = await Notification.findOneAndDelete({
+        _id: notificationId,
+        userId
+      });
+      
+      return result;
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      throw error;
+    }
+  }
+
+  static async deleteAllNotifications(userId) {
+    try {
+      const result = await Notification.deleteMany({ userId });
+      
+      return result;
+    } catch (error) {
+      console.error('Error deleting all notifications:', error);
+      throw error;
+    }
+  }
+}
+
+module.exports = NotificationService;

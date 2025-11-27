@@ -3,43 +3,48 @@ import api from './api';
 export interface Notification {
   _id: string;
   userId: string;
+  type: string;
   title: string;
   message: string;
-  type: 'post_scheduled' | 'post_published' | 'social_account_connected' | 'social_account_disconnected' | 
-        'password_changed' | 'profile_updated' | 'subscription_changed' | 'payment_processed' | 'general';
+  metadata: Record<string, any>;
   isRead: boolean;
-  data: Record<string, any>;
   createdAt: string;
-  readAt?: string;
+  updatedAt: string;
 }
 
 export interface NotificationResponse {
   success: boolean;
-  data: {
-    notifications: Notification[];
-    pagination: {
-      currentPage: number;
-      totalPages: number;
-      totalNotifications: number;
-      hasMore: boolean;
-    };
-    unreadCount: number;
+  notifications: Notification[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
   };
+  unreadCount: number;
 }
 
 export interface UnreadCountResponse {
   success: boolean;
-  data: {
-    unreadCount: number;
-  };
+  unreadCount: number;
 }
 
 const notificationApi = {
-  // Get all notifications with pagination
-  getNotifications: async (page = 1, limit = 20, unreadOnly = false): Promise<NotificationResponse> => {
-    const response = await api.get('/notifications', {
-      params: { page, limit, unreadOnly }
+  // Get notifications with pagination and filters
+  getNotifications: async (page = 1, limit = 20, unreadOnly = false, type?: string): Promise<NotificationResponse> => {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+      unreadOnly: unreadOnly.toString()
     });
+    
+    if (type) {
+      params.append('type', type);
+    }
+
+    const response = await api.get(`/notifications?${params.toString()}`);
     return response.data;
   },
 
@@ -52,12 +57,6 @@ const notificationApi = {
   // Mark notification as read
   markAsRead: async (notificationId: string) => {
     const response = await api.put(`/notifications/${notificationId}/read`);
-    return response.data;
-  },
-
-  // Mark notification as unread
-  markAsUnread: async (notificationId: string) => {
-    const response = await api.put(`/notifications/${notificationId}/unread`);
     return response.data;
   },
 

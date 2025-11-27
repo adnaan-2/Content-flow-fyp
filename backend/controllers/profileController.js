@@ -2,9 +2,9 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const cloudinary = require('cloudinary').v2;
 const streamifier = require('streamifier');
-const notificationService = require('../utils/notificationService');
 const { sendPasswordChangeSuccessEmail } = require('../utils/emailService');
 const deviceUtils = require('../utils/deviceUtils');
+const NotificationService = require('../utils/notificationService');
 
 // Configure Cloudinary
 cloudinary.config({
@@ -45,6 +45,14 @@ exports.updateProfile = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
+    // Create profile update notification
+    try {
+      await NotificationService.profileUpdated(req.user.id, 'Profile information updated successfully');
+      console.log('📢 Profile update notification created for user:', req.user.id);
+    } catch (notificationError) {
+      console.error('Profile update notification error:', notificationError);
+    }
+
     res.json({ success: true, user });
   } catch (err) {
     console.error('Error updating profile:', err.message);
@@ -83,12 +91,13 @@ exports.changePassword = async (req, res) => {
     // Save the new password
     await user.save();
 
-    // Send in-app notification
+    // Create password change notification
     try {
-      await notificationService.sendPasswordChangedNotification(req.user.id);
-      console.log('📱 Password change notification sent to user:', req.user.id);
+      const deviceInfo = deviceUtils.getDeviceInfo(req);
+      await NotificationService.profileUpdated(req.user.id, `Password changed successfully from ${deviceInfo.device} (${deviceInfo.os})`);
+      console.log('📢 Password change notification created for user:', req.user.id);
     } catch (notificationError) {
-      console.error('📱 Password change notification error:', notificationError);
+      console.error('Password change notification error:', notificationError);
     }
 
     // Send security email notification
@@ -157,6 +166,14 @@ exports.uploadProfilePhoto = async (req, res) => {
       { new: true }
     ).select('-password');
 
+    // Create profile photo update notification
+    try {
+      await NotificationService.profileUpdated(req.user.id, 'Profile photo updated successfully');
+      console.log('📢 Profile photo update notification created for user:', req.user.id);
+    } catch (notificationError) {
+      console.error('Profile photo notification error:', notificationError);
+    }
+
     res.json({
       success: true,
       message: 'Profile photo uploaded successfully',
@@ -217,6 +234,14 @@ exports.uploadImage = async (req, res) => {
 
     console.log('User updated successfully');
 
+    // Create profile photo update notification
+    try {
+      await NotificationService.profileUpdated(req.user.id, 'Profile photo uploaded successfully');
+      console.log('📢 Profile photo upload notification created for user:', req.user.id);
+    } catch (notificationError) {
+      console.error('Profile photo upload notification error:', notificationError);
+    }
+
     res.json({
       success: true,
       message: 'Profile photo uploaded successfully',
@@ -257,6 +282,14 @@ exports.deleteProfilePhoto = async (req, res) => {
       },
       { new: true }
     ).select('-password');
+
+    // Create profile photo delete notification
+    try {
+      await NotificationService.profileUpdated(req.user.id, 'Profile photo removed successfully');
+      console.log('📢 Profile photo delete notification created for user:', req.user.id);
+    } catch (notificationError) {
+      console.error('Profile photo delete notification error:', notificationError);
+    }
 
     res.json({
       success: true,

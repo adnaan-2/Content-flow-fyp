@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const SocialAccount = require('../models/SocialAccount');
+const NotificationService = require('../services/notificationService');
 const { authenticateToken } = require('../middleware/auth');
 const axios = require('axios');
 
@@ -244,6 +245,14 @@ router.post('/auth/facebook/callback', authenticateToken, async (req, res) => {
     } else {
       facebookAccount = await SocialAccount.create(accountData);
       console.log('✨ Created new Facebook account');
+      
+      // Send notification for new Facebook account connection
+      try {
+        await NotificationService.socialAccountConnected(req.user.id, 'Facebook', facebookUser.name);
+        console.log('📱 Facebook connection notification sent');
+      } catch (notificationError) {
+        console.error('❌ Facebook connection notification error:', notificationError);
+      }
     }
 
     // Step 5: Handle Instagram business accounts using the recommended page/{page_id}/instagram_accounts endpoint
@@ -298,16 +307,11 @@ router.post('/auth/facebook/callback', authenticateToken, async (req, res) => {
             await SocialAccount.create(instagramAccountData);
             console.log('✨ Created Instagram account:', instagramData.username);
             
-            // Send email notification for new Instagram connection
+            // Send notification for new account connection
             try {
-              const user = await User.findById(req.user.id);
-              if (user) {
-                await notificationService.sendSocialAccountConnectedNotification(req.user.id, 'Instagram', instagramData.username);
-                console.log('📧 Instagram connection email sent to:', user.email);
-              }
-            } catch (emailError) {
-              console.error('📧 Instagram connection email error:', emailError);
-              // Don't fail the connection if email fails
+              await NotificationService.socialAccountConnected(req.user.id, 'Instagram', instagramData.username);
+            } catch (notificationError) {
+              console.error('Connection notification error:', notificationError);
             }
           }
         }
@@ -447,6 +451,14 @@ router.post('/auth/linkedin/callback', authenticateToken, async (req, res) => {
     } else {
       savedAccount = await SocialAccount.create(accountData);
       console.log('✨ Created new LinkedIn account');
+      
+      // Send notification for new LinkedIn account connection
+      try {
+        await NotificationService.socialAccountConnected(req.user.id, 'LinkedIn', profile.name);
+        console.log('📱 LinkedIn connection notification sent');
+      } catch (notificationError) {
+        console.error('❌ LinkedIn connection notification error:', notificationError);
+      }
     }
 
     console.log('LinkedIn account saved to database:', savedAccount._id);
@@ -1122,17 +1134,7 @@ router.post('/auth/instagram/callback', authenticateToken, async (req, res) => {
             console.log('✨ Created Instagram account:', instagramData.username);
             instagramAccountsCreated++;
             
-            // Send email notification for new Instagram connection
-            try {
-              const user = await User.findById(req.user.id);
-              if (user) {
-                await notificationService.sendSocialAccountConnectedNotification(req.user.id, 'Instagram', instagramData.username);
-                console.log('📧 Instagram connection email sent to:', user.email);
-              }
-            } catch (emailError) {
-              console.error('📧 Instagram connection email error:', emailError);
-              // Don't fail the connection if email fails
-            }
+            // Email notifications removed - will be implemented fresh
           }
         }
 

@@ -3,6 +3,7 @@ const router = express.Router();
 const Subscription = require('../models/Subscription');
 const SocialAccount = require('../models/SocialAccount');
 const User = require('../models/User');
+const NotificationService = require('../services/notificationService');
 const { authenticateToken } = require('../middleware/auth');
 const stripeService = require('../services/stripeService');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
@@ -319,6 +320,15 @@ router.post('/mock-payment-success', authenticateToken, async (req, res) => {
     
     await subscription.save();
 
+    // Send notification for subscription activation
+    try {
+      const planName = planType === 'pro_monthly' ? 'Pro Monthly' : 'Pro Yearly';
+      await NotificationService.subscriptionActivated(req.user.id, planName, []);
+      console.log('📢 Mock subscription activation notification created for user:', req.user.id);
+    } catch (notificationError) {
+      console.error('📢 Error creating mock subscription activation notification:', notificationError);
+    }
+
     res.json({
       success: true,
       message: `Successfully upgraded to ${planType} plan!`,
@@ -363,6 +373,17 @@ router.post('/verify-checkout', authenticateToken, async (req, res) => {
       
       // Update subscription in database
       await stripeService.updateUserSubscriptionFromStripe(req.user.id, session.subscription.id || session.subscription);
+      
+      // Create subscription activation notification
+      try {
+        // Get the updated subscription from database to get the plan type
+        const subscription = await Subscription.findOne({ userId: req.user.id });
+        const planName = subscription?.planType || 'Pro Plan';
+        await NotificationService.subscriptionActivated(req.user.id, planName, []);
+        console.log('📢 Subscription activation notification created for user:', req.user.id, 'Plan:', planName);
+      } catch (notificationError) {
+        console.error('📢 Error creating subscription activation notification:', notificationError);
+      }
       
       res.json({
         success: true,
@@ -516,6 +537,14 @@ router.post('/cancel', authenticateToken, async (req, res) => {
     subscription.paymentMethodId = null;
     subscription.stripeSubscriptionId = null;
     await subscription.save();
+
+    // Send notification for subscription cancellation
+    try {
+      await NotificationService.subscriptionCancelled(req.user.id, 'pro', 'Pro Plan');
+      console.log('📱 Subscription cancellation notification sent');
+    } catch (notificationError) {
+      console.error('❌ Subscription cancellation notification error:', notificationError);
+    }
 
     res.json({
       success: true,

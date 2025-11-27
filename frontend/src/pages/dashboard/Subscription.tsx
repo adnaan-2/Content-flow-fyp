@@ -6,6 +6,7 @@ import { Check, Star, CreditCard, Calendar, DollarSign, Shield, Users, BarChart,
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useSubscription } from "@/contexts/SubscriptionContext";
+import { useNotifications } from "@/contexts/NotificationContext";
 import subscriptionApi from "@/services/subscriptionApi";
 
 interface Plan {
@@ -48,6 +49,7 @@ const Subscription = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const { subscription, refreshSubscription } = useSubscription();
+  const { triggerRefresh } = useNotifications();
   // Using global subscription from context instead of local state
   const [availablePlans, setAvailablePlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,6 +75,9 @@ const Subscription = () => {
             description: "Your subscription has been activated.",
           });
           loadSubscriptionData();
+          
+          // Trigger notification refresh to show activation notification
+          setTimeout(triggerRefresh, 500);
         })
         .catch(() => {
           toast({
@@ -172,6 +177,9 @@ const Subscription = () => {
               description: `Successfully upgraded to ${selectedPlan?.name}`,
             });
             await loadSubscriptionData();
+            
+            // Trigger notification refresh to show activation notification
+            setTimeout(triggerRefresh, 500);
           }
         } else {
           // Redirect to Stripe checkout
@@ -198,6 +206,9 @@ const Subscription = () => {
       });
       await loadSubscriptionData();
       await refreshSubscription(); // Refresh global context
+      
+      // Trigger notification refresh to show cancellation notification
+      setTimeout(triggerRefresh, 500);
     } catch (error: any) {
       toast({
         title: "Error",

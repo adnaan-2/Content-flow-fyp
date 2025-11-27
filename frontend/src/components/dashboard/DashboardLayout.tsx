@@ -23,8 +23,11 @@ const DashboardLayout = () => {
         <DashboardHeader toggleSidebar={toggleSidebar} />
         
         {/* Main scrollable content */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-50 dark:bg-black">
-          <Outlet />
+        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-black">
+          {/* Dashboard Content Wrapper - handles header spacing for all pages */}
+          <div className="dashboard-content-wrapper pt-10 p-4 md:p-6 min-h-screen">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

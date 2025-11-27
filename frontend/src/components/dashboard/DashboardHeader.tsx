@@ -2,8 +2,7 @@ import { useState } from "react";
 import { User, ChevronDown, Menu } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNotifications } from "@/contexts/NotificationContext";
-import SimpleNotificationDropdown from "./SimpleNotificationDropdown";
+import NotificationDropdown from "./NotificationDropdown";
 import { 
   Avatar, 
   AvatarFallback, 
@@ -26,7 +25,6 @@ interface DashboardHeaderProps {
 
 const DashboardHeader = ({ toggleSidebar }: DashboardHeaderProps) => {
   const { user, logout } = useAuth();
-  const { unreadCount } = useNotifications();
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -49,20 +47,37 @@ const DashboardHeader = ({ toggleSidebar }: DashboardHeaderProps) => {
   };
   
   return (
-    <header className="bg-white dark:bg-black border-b border-gray-200 dark:border-gray-800 py-3 px-4 flex items-center justify-between shadow-sm">
-      <Button 
-        variant="ghost" 
-        size="icon" 
-        onClick={toggleSidebar}
-        className="md:hidden"
-      >
-        <Menu className="h-5 w-5" />
-      </Button>
+    <header className="fixed top-0 left-0 right-0 z-50 backdrop-blur-lg bg-white/80 dark:bg-black/80 border-b border-gray-200/60 dark:border-gray-800/60 py-3 px-4 flex items-center justify-between shadow-lg">
+      <div className="flex items-center gap-4">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={toggleSidebar}
+          className="md:hidden"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+        
+        {/* Logo/Brand - always visible */}
+        <Link to="/dashboard" className="flex items-center gap-2 text-primary font-bold text-lg">
+          <div className="flex flex-col items-center">
+            <div className="flex">
+              <div className="w-3 h-3 bg-primary rounded-sm"></div>
+              <div className="w-3 h-3 bg-primary/70 ml-1 rounded-sm"></div>
+            </div>
+            <div className="flex mt-1">
+              <div className="w-3 h-3 bg-primary/70 rounded-sm"></div>
+              <div className="w-3 h-3 bg-primary rounded-sm ml-1"></div>
+            </div>
+          </div>
+          <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">ContentFlow</span>
+        </Link>
+      </div>
       
       <div className="flex-1" />
       
       <div className="flex items-center space-x-4">
-        <SimpleNotificationDropdown unreadCount={unreadCount} />
+        <NotificationDropdown />
         
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

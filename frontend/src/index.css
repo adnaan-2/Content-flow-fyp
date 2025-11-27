@@ -96,6 +96,13 @@
   .section-padding {
     @apply py-16 sm:py-20 md:py-24 px-4 sm:px-6 md:px-8;
   }
+
+  .dashboard-content-wrapper {
+    /* Ensures all dashboard pages have proper spacing below fixed header */
+    @apply pt-10 p-4 md:p-6 min-h-screen;
+    margin-top: 0 !important;
+    padding-top: 4rem !important; /* 64px to account for fixed header */
+  }
   
   .auth-card {
     @apply bg-white/5 backdrop-blur-xl border border-white/10 shadow-lg transition-all duration-200 hover:border-primary/20 hover:shadow-primary/5;
