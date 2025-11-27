@@ -50,7 +50,9 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       // Set default subscription state on error
       setSubscription({
         planType: 'basic',
-        status: 'active'
+        status: 'active',
+        paymentMethodId: null,
+        billingHistory: []
       });
     } finally {
       setLoading(false);
@@ -63,7 +65,9 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       // Set default basic plan for unauthenticated users
       setSubscription({
         planType: 'basic',
-        status: 'active'
+        status: 'active',
+        paymentMethodId: null,
+        billingHistory: []
       });
       return;
     }
