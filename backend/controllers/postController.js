@@ -262,7 +262,9 @@ const postToFacebook = async (account, content, pageId = null) => {
     }
 
     const response = await axios.post(endpoint, postData);
-    return response.data.id || response.data.post_id;
+    const createdId = response.data.id || response.data.post_id;
+    // Return both post id and target page used (for analytics + URLs)
+    return { id: createdId, pageId: targetPageId };
   } catch (error) {
     console.error('Facebook posting error:', error.response?.data || error.message);
     throw new Error(`Facebook posting failed: ${error.response?.data?.error?.message || error.message}`);
@@ -818,11 +820,13 @@ const postNow = async (req, res) => {
         console.log(`🔄 About to post to ${platform}...`);
 
         // Post to platform
-        const postId = await postToSocialMedia(
+        const postResult = await postToSocialMedia(
           account, 
           content, 
           platform === 'facebook' ? facebookPageId : null
         );
+        const postId = typeof postResult === 'string' ? postResult : postResult.id;
+        const usedFacebookPageId = typeof postResult === 'object' ? postResult.pageId : undefined;
 
         // Generate platform URL
         const platformUrl = generatePlatformUrl(platform, postId, account);
@@ -837,6 +841,7 @@ const postNow = async (req, res) => {
           content,
           publishedTime: new Date(),
           status: 'published',
+          facebookPageId: platform === 'facebook' ? usedFacebookPageId : undefined,
           analytics: {
             likes: 0,
             comments: 0,
@@ -1015,17 +1020,20 @@ const schedulePost = async (req, res) => {
           }
 
           // Post to platform
-          const postId = await postToSocialMedia(
+          const postResult = await postToSocialMedia(
             account, 
             post.content, 
-            platform === 'facebook' ? facebookPageId : null
+            post.platform === 'facebook' ? facebookPageId : null
           );
+          const postId = typeof postResult === 'string' ? postResult : postResult.id;
+          const usedFacebookPageId = typeof postResult === 'object' ? postResult.pageId : undefined;
 
           // Update post record
           await Post.findByIdAndUpdate(post._id, {
             postId,
             status: 'published',
-            publishedTime: new Date()
+            publishedTime: new Date(),
+            facebookPageId: post.platform === 'facebook' ? usedFacebookPageId : undefined
           });
 
           publishedPlatforms.push(post.platform);

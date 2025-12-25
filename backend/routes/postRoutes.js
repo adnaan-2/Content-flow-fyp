@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const axios = require('axios');
 const {
   postNow,
   getUserPosts,
@@ -71,15 +72,79 @@ router.get('/analytics', async (req, res) => {
     console.log('📊 Fetching posts for user:', req.user.id);
     const Post = require('../models/Post');
     const SocialAccount = require('../models/SocialAccount');
-    
+    const GRAPH_BASE = 'https://graph.facebook.com/v18.0';
+
     // Fetch all posts for the user
     const posts = await Post.find({ userId: req.user.id })
-      .populate('socialAccountId', 'platform accountName profilePicture')
+      .populate('socialAccountId', 'platform accountName profilePicture platformData')
       .sort({ createdAt: -1 });
 
     console.log(`✅ Found ${posts.length} posts`);
 
-    // Simple format - just return the posts with platform URLs
+    // Enrich analytics with real-time likes/comments for IG and FB
+    for (const post of posts) {
+      if (post.status !== 'published') continue;
+      try {
+        const accId = post.socialAccountId?._id || post.socialAccountId;
+        const account = await SocialAccount.findById(accId);
+        if (!account) continue;
+
+        if (post.platform === 'instagram' && post.postId && post.postId !== 'scheduled' && post.postId !== 'failed') {
+          const url = `${GRAPH_BASE}/${post.postId}`;
+          const { data } = await axios.get(url, {
+            params: { fields: 'like_count,comments_count', access_token: account.accessToken }
+          });
+          post.analytics = {
+            ...(post.analytics || {}),
+            likes: typeof data.like_count === 'number' ? data.like_count : (post.analytics?.likes || 0),
+            comments: typeof data.comments_count === 'number' ? data.comments_count : (post.analytics?.comments || 0)
+          };
+        }
+
+        if (post.platform === 'facebook' && post.postId && post.postId !== 'scheduled' && post.postId !== 'failed') {
+          // Prefer page token when available
+          let token = account.accessToken;
+          const pageId = post.facebookPageId;
+          if (pageId && Array.isArray(account.platformData?.pages)) {
+            const page = account.platformData.pages.find(p => p.id === pageId);
+            if (page?.accessToken) token = page.accessToken;
+          }
+          const url = `${GRAPH_BASE}/${post.postId}`;
+          let likesCount = 0;
+          let commentsCount = 0;
+          try {
+            // Try reactions first (works for Post nodes)
+            const { data } = await axios.get(url, {
+              params: { fields: 'reactions.summary(true),comments.summary(true)', access_token: token }
+            });
+            likesCount = data.reactions?.summary?.total_count || 0;
+            commentsCount = data.comments?.summary?.total_count || 0;
+          } catch (err) {
+            const msg = err.response?.data?.error?.message || '';
+            // Fallback to likes on Photo nodes
+            if (msg.includes('nonexisting field (reactions)')) {
+              const { data } = await axios.get(url, {
+                params: { fields: 'likes.summary(true),comments.summary(true)', access_token: token }
+              });
+              likesCount = data.likes?.summary?.total_count || 0;
+              commentsCount = data.comments?.summary?.total_count || 0;
+            } else {
+              throw err;
+            }
+          }
+          post.analytics = {
+            ...(post.analytics || {}),
+            likes: likesCount,
+            comments: commentsCount,
+            shares: post.analytics?.shares || 0
+          };
+        }
+      } catch (e) {
+        console.warn('Analytics enrichment failed for post', post._id, e.response?.data || e.message);
+      }
+    }
+
+    // Format output
     const formattedPosts = posts.map(post => ({
       _id: post._id,
       platform: post.platform,
@@ -90,6 +155,7 @@ router.get('/analytics', async (req, res) => {
       createdAt: post.createdAt,
       platformUrl: post.platformUrl,
       postId: post.postId,
+      facebookPageId: post.facebookPageId,
       analytics: post.analytics || {
         likes: 0,
         comments: 0,
@@ -102,7 +168,7 @@ router.get('/analytics', async (req, res) => {
       errorMessage: post.errorMessage
     }));
 
-    console.log(`📤 Sending ${formattedPosts.length} posts to frontend`);
+    console.log(`📤 Sending ${formattedPosts.length} enriched posts to frontend`);
     res.json({ success: true, posts: formattedPosts });
   } catch (error) {
     console.error('Get posts analytics error:', error);

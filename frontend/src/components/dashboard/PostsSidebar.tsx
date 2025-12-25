@@ -10,6 +10,7 @@ interface Post {
   platform: string;
   postId?: string;
   platformUrl?: string;
+  facebookPageId?: string;
   content: {
     text?: string;
     mediaUrls?: string[];
@@ -41,9 +42,11 @@ export default function PostsSidebar() {
   const fetchPosts = async (showLoader = true) => {
     try {
       if (showLoader) setLoading(true);
-      const response = await api.get('/posts');
+      // Use enriched analytics endpoint for accurate likes/comments
+      const response = await api.get('/posts/analytics');
+      const rawPosts = (response.data.posts || []).length ? response.data.posts : (response.data.data?.posts || []);
       // Filter out failed posts
-      const filteredPosts = (response.data.posts || []).filter((post: Post) => post.status !== 'failed');
+      const filteredPosts = (rawPosts || []).filter((post: Post) => post.status !== 'failed');
       setPosts(filteredPosts);
     } catch (error) {
       console.error('Error fetching posts:', error);
@@ -128,13 +131,12 @@ export default function PostsSidebar() {
           break;
           
         case 'facebook':
-          // Use proper Facebook post URL format
-          const fbUserId = post.socialAccountId?.platformData?.username || 
-                          post.socialAccountId?.platformData?.username;
-          if (fbUserId && post.postId) {
-            return `https://www.facebook.com/${fbUserId}/posts/${post.postId}`;
+          // Prefer page-specific URL when available
+          if (post.facebookPageId && post.postId) {
+            return `https://www.facebook.com/${post.facebookPageId}/posts/${post.postId}`;
           }
-          return `https://www.facebook.com/${post.postId}`;
+          // Fallback to post-only URL
+          return post.postId ? `https://www.facebook.com/${post.postId}` : null;
           
         case 'x':
         case 'twitter':
