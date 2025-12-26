@@ -88,38 +88,6 @@ const Settings = () => {
         <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
-              {theme === 'light' ? <Sun className="h-5 w-5 text-yellow-500" /> : <Moon className="h-5 w-5 text-blue-500" />}
-              Appearance
-            </CardTitle>
-            <CardDescription className="text-gray-600 dark:text-gray-400">Customize the look and feel of the interface</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2">
-                  {theme === 'light' ? (
-                    <Sun className="h-4 w-4 text-yellow-500" />
-                  ) : (
-                    <Moon className="h-4 w-4 text-blue-500" />
-                  )}
-                  <Label htmlFor="theme-toggle" className="text-gray-700 dark:text-gray-300 font-medium">Dark Mode</Label>
-                </div>
-                <span className="text-sm text-gray-500 dark:text-gray-400 ml-6">
-                  Switch between light and dark themes
-                </span>
-              </div>
-              <Switch 
-                id="theme-toggle" 
-                checked={theme === 'dark'}
-                onCheckedChange={toggleTheme}
-              />
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
               <Lock className="h-5 w-5" />
               Security
             </CardTitle>

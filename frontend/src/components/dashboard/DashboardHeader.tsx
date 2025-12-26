@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { User, ChevronDown, Menu } from "lucide-react";
+import { User, ChevronDown, Menu, Moon, Sun } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import NotificationDropdown from "./NotificationDropdown";
 import { 
   Avatar, 
@@ -25,6 +26,7 @@ interface DashboardHeaderProps {
 
 const DashboardHeader = ({ toggleSidebar }: DashboardHeaderProps) => {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -77,6 +79,18 @@ const DashboardHeader = ({ toggleSidebar }: DashboardHeaderProps) => {
       <div className="flex-1" />
       
       <div className="flex items-center space-x-4">
+        {/* Theme Toggle Button */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={toggleTheme}
+          className="relative h-9 w-9 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all"
+        >
+          <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+          <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+          <span className="sr-only">Toggle theme</span>
+        </Button>
+        
         <NotificationDropdown />
         
         <DropdownMenu>
