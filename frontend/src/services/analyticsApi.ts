@@ -142,7 +142,8 @@ class AnalyticsApi {
   // Get posts with analytics
   async getPosts() {
     try {
-      const response = await api.get('/social-media/posts/analytics');
+      // Use the posts analytics endpoint that enriches with real platform data
+      const response = await api.get('/posts/analytics');
       return response.data;
     } catch (error: any) {
       console.error('Posts Analytics API Error:', error);

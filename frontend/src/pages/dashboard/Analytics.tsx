@@ -33,7 +33,8 @@ import {
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  Legend
 } from 'recharts';
 
 const Analytics: React.FC = () => {
@@ -42,6 +43,21 @@ const Analytics: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState('weekly');
   const [syncing, setSyncing] = useState(false);
+  const [posts, setPosts] = useState<any[]>([]);
+  const [postsLoaded, setPostsLoaded] = useState(false);
+
+  // Platform normalization
+  const PLATFORM_ORDER = [
+    { key: 'instagram', name: 'Instagram', color: '#E4405F' },
+    { key: 'facebook', name: 'Facebook', color: '#1877F2' },
+    { key: 'linkedin', name: 'LinkedIn', color: '#0A66C2' },
+    { key: 'twitter', name: 'Twitter', color: '#1DA1F2' },
+  ];
+  const normalizePlatformKey = (p: string) => {
+    const k = (p || '').toLowerCase();
+    if (k === 'x') return 'twitter';
+    return k;
+  };
 
   // Fetch analytics data
   const fetchAnalyticsData = async () => {
@@ -50,6 +66,17 @@ const Analytics: React.FC = () => {
       setError(null);
       const response = await analyticsApi.getDashboard({ timeRange });
       setData(response.data);
+      // Also fetch per-post analytics from real endpoint
+      try {
+        const postsRes = await analyticsApi.getPosts();
+        const postsList = postsRes.posts || postsRes.data?.posts || [];
+        setPosts(postsList);
+        setPostsLoaded(true);
+      } catch (postErr: any) {
+        console.warn('Posts analytics fetch warning:', postErr?.message || postErr);
+        setPosts([]);
+        setPostsLoaded(false);
+      }
     } catch (err: any) {
       console.error('Analytics fetch error:', err);
       setError(err.message || 'Failed to load analytics data');
@@ -89,26 +116,146 @@ const Analytics: React.FC = () => {
   // Prepare chart data
   const prepareChartData = () => {
     if (!data?.platformBreakdown) return [];
-    
-    return data.platformBreakdown.map(platform => ({
-      name: platform.platformName,
-      followers: platform.metrics.followers,
-      engagement: platform.metrics.engagement,
-      posts: platform.metrics.posts,
-      likes: platform.metrics.likes,
-      comments: platform.metrics.comments,
-      impressions: platform.metrics.impressions
+    const map: Record<string, any> = {};
+    data.platformBreakdown.forEach(pb => {
+      const key = normalizePlatformKey(pb.platform);
+      map[key] = {
+        name: pb.platformName,
+        followers: pb.metrics.followers || 0,
+        engagement: pb.metrics.engagement || 0,
+        posts: pb.metrics.posts || 0,
+        likes: pb.metrics.likes || 0,
+        comments: pb.metrics.comments || 0,
+        impressions: pb.metrics.impressions || 0,
+      };
+    });
+    return PLATFORM_ORDER.map(p => map[p.key] || {
+      name: p.name,
+      followers: 0,
+      engagement: 0,
+      posts: 0,
+      likes: 0,
+      comments: 0,
+      impressions: 0,
+    });
+  };
+
+  const pieChartData = (() => {
+    const breakdownMap: Record<string, number> = {};
+    (data?.platformBreakdown || []).forEach(pb => {
+      const key = normalizePlatformKey(pb.platform);
+      breakdownMap[key] = (pb.metrics?.followers || 0);
+    });
+    return PLATFORM_ORDER.map(p => ({
+      name: p.name,
+      value: breakdownMap[p.key] || 0,
+      fill: p.color
+    }));
+  })();
+
+  // Compute totals from real posts
+  const computeTotals = () => {
+    const totals = {
+      posts: 0,
+      likes: 0,
+      comments: 0,
+      shares: 0,
+      impressions: 0,
+      followers: 0,
+      avgEngagement: 0,
+    };
+    posts.forEach(p => {
+      const a = p?.analytics || {};
+      totals.posts += 1;
+      totals.likes += Number(a.likes || 0);
+      totals.comments += Number(a.comments || 0);
+      totals.shares += Number(a.shares || 0);
+      const impressions = (a.impressions != null ? a.impressions : a.views != null ? a.views : 0);
+      totals.impressions += Number(impressions || 0);
+    });
+    totals.followers = (data?.platformBreakdown || []).reduce((sum, pb) => sum + (pb.metrics?.followers || 0), 0);
+    const interactions = totals.likes + totals.comments + totals.shares;
+    totals.avgEngagement = totals.followers > 0 ? (interactions / totals.followers) * 100 : 0;
+    return totals;
+  };
+
+  // Helpers for post analytics
+  const getPostEngagement = (p: any) => {
+    const a = p?.analytics || {};
+    const likes = Number(a.likes || 0);
+    const comments = Number(a.comments || 0);
+    const shares = Number(a.shares || 0);
+    const views = Number(a.views || 0);
+    // Prioritize interactions; include views lightly
+    return likes + comments + shares + Math.floor(views * 0.1);
+  };
+
+  const computePlatformEngagement = () => {
+    const byPlatform: Record<string, { name: string; engagement: number; posts: number }> = {};
+    posts.forEach(p => {
+      const key = (p.platform || 'unknown').toLowerCase();
+      const e = getPostEngagement(p);
+      if (!byPlatform[key]) byPlatform[key] = { name: key.charAt(0).toUpperCase() + key.slice(1), engagement: 0, posts: 0 };
+      byPlatform[key].engagement += e;
+      byPlatform[key].posts += 1;
+    });
+    return Object.values(byPlatform).map(item => ({
+      name: item.name,
+      engagement: item.engagement,
+      avgEngagement: item.posts ? item.engagement / item.posts : 0,
+      posts: item.posts
     }));
   };
 
-  const pieChartData = data?.platformBreakdown.map(platform => ({
-    name: platform.platformName,
-    value: platform.metrics.followers,
-    fill: platform.platform === 'facebook' ? '#1877F2' :
-          platform.platform === 'instagram' ? '#E4405F' :
-          platform.platform === 'twitter' ? '#1DA1F2' :
-          platform.platform === 'linkedin' ? '#0A66C2' : '#6B7280'
-  })) || [];
+  const computeTimeHistogram = () => {
+    const buckets: Record<number, { hour: number; engagement: number; count: number }> = {};
+    for (let h = 0; h < 24; h++) buckets[h] = { hour: h, engagement: 0, count: 0 };
+    posts.forEach(p => {
+      const dtStr = p.publishedTime || p.createdAt || p.scheduledTime;
+      if (!dtStr) return;
+      const d = new Date(dtStr);
+      const hour = d.getHours();
+      const e = getPostEngagement(p);
+      buckets[hour].engagement += e;
+      buckets[hour].count += 1;
+    });
+    return Object.values(buckets).map(b => ({
+      hour: `${b.hour}:00`,
+      avgEngagement: b.count ? Math.round(b.engagement / b.count) : 0,
+      count: b.count
+    }));
+  };
+
+  const computeBestFormat = () => {
+    const byType: Record<string, { type: string; engagement: number; count: number }> = {};
+    posts.forEach(p => {
+      const t = (p?.content?.mediaType || 'text').toLowerCase();
+      const e = getPostEngagement(p);
+      if (!byType[t]) byType[t] = { type: t, engagement: 0, count: 0 };
+      byType[t].engagement += e;
+      byType[t].count += 1;
+    });
+    const arr = Object.values(byType).map(x => ({ type: x.type, avg: x.count ? x.engagement / x.count : 0, count: x.count }));
+    arr.sort((a, b) => b.avg - a.avg);
+    return arr[0] || { type: 'text', avg: 0, count: 0 };
+  };
+
+  const getAISuggestions = () => {
+    const platformSeries = computePlatformEngagement();
+    const bestPlatform = platformSeries.length ? platformSeries.slice().sort((a, b) => b.avgEngagement - a.avgEngagement)[0] : null;
+    const timeSeries = computeTimeHistogram();
+    const bestTime = timeSeries.length ? timeSeries.slice().sort((a, b) => b.avgEngagement - a.avgEngagement)[0] : null;
+    const bestFormat = computeBestFormat();
+
+    return {
+      platform: bestPlatform?.name || 'N/A',
+      platformHint: bestPlatform ? `Avg engagement ${formatNumber(Math.round(bestPlatform.avgEngagement))}` : 'Insufficient data',
+      timeWindow: bestTime ? bestTime.hour : 'N/A',
+      timeHint: bestTime ? `Avg engagement ${formatNumber(bestTime.avgEngagement)}` : 'Insufficient data',
+      format: bestFormat.type,
+      formatHint: bestFormat.count ? `Across ${bestFormat.count} posts` : 'Insufficient data'
+    };
+  };
 
   // Loading state
   if (loading) {
@@ -193,6 +340,7 @@ const Analytics: React.FC = () => {
 
       {/* Key Metrics Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {(() => { const totals = computeTotals(); return (<>
         <Card className="bg-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
@@ -202,7 +350,7 @@ const Analytics: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">
-              {formatNumber(data.totalMetrics.followers)}
+              {formatNumber(totals.followers)}
             </div>
             <div className={`text-sm flex items-center mt-1 ${getGrowthTrend(data.growthMetrics.followersGrowth).color}`}>
               {data.growthMetrics.followersGrowth > 0 ? <ArrowUpRight className="h-3 w-3 mr-1" /> : <ArrowDownRight className="h-3 w-3 mr-1" />}
@@ -220,7 +368,7 @@ const Analytics: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">
-              {formatNumber(data.totalMetrics.likes + data.totalMetrics.comments + data.totalMetrics.shares)}
+              {formatNumber(totals.likes + totals.comments + totals.shares)}
             </div>
             <div className={`text-sm flex items-center mt-1 ${getGrowthTrend(data.growthMetrics.engagementGrowth).color}`}>
               {data.growthMetrics.engagementGrowth > 0 ? <ArrowUpRight className="h-3 w-3 mr-1" /> : <ArrowDownRight className="h-3 w-3 mr-1" />}
@@ -238,7 +386,7 @@ const Analytics: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">
-              {formatNumber(data.totalMetrics.impressions)}
+              {formatNumber(totals.impressions)}
             </div>
             <div className={`text-sm flex items-center mt-1 ${getGrowthTrend(data.growthMetrics.reachGrowth).color}`}>
               {data.growthMetrics.reachGrowth > 0 ? <ArrowUpRight className="h-3 w-3 mr-1" /> : <ArrowDownRight className="h-3 w-3 mr-1" />}
@@ -256,7 +404,7 @@ const Analytics: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">
-              {data.totalMetrics.avgEngagement.toFixed(1)}%
+              {totals.avgEngagement.toFixed(1)}%
             </div>
             <div className={`text-sm flex items-center mt-1 ${getGrowthTrend(data.growthMetrics.engagementGrowth).color}`}>
               {data.growthMetrics.engagementGrowth > 0 ? <ArrowUpRight className="h-3 w-3 mr-1" /> : <ArrowDownRight className="h-3 w-3 mr-1" />}
@@ -264,6 +412,7 @@ const Analytics: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+        </>); })()}
       </div>
 
       {/* Analytics Tabs */}
@@ -272,6 +421,7 @@ const Analytics: React.FC = () => {
           <TabsTrigger value="overview" className="data-[state=active]:bg-background">Overview</TabsTrigger>
           <TabsTrigger value="platforms" className="data-[state=active]:bg-background">Platforms</TabsTrigger>
           <TabsTrigger value="engagement" className="data-[state=active]:bg-background">Engagement</TabsTrigger>
+          <TabsTrigger value="insights" className="data-[state=active]:bg-background">Insights</TabsTrigger>
           <TabsTrigger value="growth" className="data-[state=active]:bg-background">Growth</TabsTrigger>
         </TabsList>
 
@@ -291,15 +441,24 @@ const Analytics: React.FC = () => {
                       cy="50%"
                       outerRadius={80}
                       dataKey="value"
-                      label={({ name, value }) => `${name}: ${formatNumber(value)}`}
+                      labelLine={false}
                     >
                       {pieChartData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.fill} />
                       ))}
                     </Pie>
                     <Tooltip formatter={(value) => formatNumber(Number(value))} />
+                    <Legend />
                   </PieChart>
                 </ResponsiveContainer>
+                <div className="grid grid-cols-2 gap-2 mt-4">
+                  {pieChartData.map((p, i) => (
+                    <div key={i} className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">{p.name}</span>
+                      <span className="text-foreground font-medium">{formatNumber(p.value)}</span>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
 
@@ -403,6 +562,94 @@ const Analytics: React.FC = () => {
                   <Area type="monotone" dataKey="likes" stackId="1" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.6} />
                   <Area type="monotone" dataKey="comments" stackId="1" stroke="hsl(var(--secondary))" fill="hsl(var(--secondary))" fillOpacity={0.6} />
                 </AreaChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Per-Post Engagement by Platform */}
+          <Card className="bg-card">
+            <CardHeader>
+              <CardTitle className="text-foreground">Per-Post Engagement by Platform</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={320}>
+                <BarChart data={computePlatformEngagement()}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="name" className="text-muted-foreground" />
+                  <YAxis className="text-muted-foreground" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '6px'
+                    }}
+                  />
+                  <Bar dataKey="avgEngagement" name="Avg Engagement" fill="hsl(var(--primary))" />
+                  <Bar dataKey="posts" name="Posts" fill="hsl(var(--secondary))" />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Insights (AI Suggestions) */}
+        <TabsContent value="insights" className="space-y-6">
+          <Card className="bg-card">
+            <CardHeader>
+              <CardTitle className="text-foreground">AI Suggestions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {postsLoaded && posts.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {(() => {
+                    const s = getAISuggestions();
+                    return (
+                      <>
+                        <div className="space-y-1">
+                          <div className="text-sm text-muted-foreground">Best Platform</div>
+                          <div className="text-xl font-semibold text-foreground">{s.platform}</div>
+                          <div className="text-xs text-muted-foreground">{s.platformHint}</div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-sm text-muted-foreground">Best Time to Post</div>
+                          <div className="text-xl font-semibold text-foreground">{s.timeWindow}</div>
+                          <div className="text-xs text-muted-foreground">{s.timeHint}</div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-sm text-muted-foreground">Best Format</div>
+                          <div className="text-xl font-semibold text-foreground">{s.format}</div>
+                          <div className="text-xs text-muted-foreground">{s.formatHint}</div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              ) : (
+                <div className="text-muted-foreground">Insufficient post data to generate suggestions.</div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Engagement by Hour */}
+          <Card className="bg-card">
+            <CardHeader>
+              <CardTitle className="text-foreground">Average Engagement by Hour</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={280}>
+                <LineChart data={computeTimeHistogram()}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="hour" className="text-muted-foreground" />
+                  <YAxis className="text-muted-foreground" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '6px'
+                    }}
+                  />
+                  <Line type="monotone" dataKey="avgEngagement" stroke="hsl(var(--primary))" />
+                </LineChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
